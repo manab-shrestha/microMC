@@ -73,6 +73,44 @@ for file in files:
 
 
         #print(list(nuc.keys()))
-        print(list(nuc["reactions"]["reaction_002"]["product_0"]["distribution_0"]["angle"]["mu"]))
+        #print(nuc["reactions"]["reaction_002"]["product_0"]["distribution_0"]["angle"].keys())
+        if "reaction_018" in nuc["reactions"]:
+            print(list(nuc["reactions"]["reaction_018"]["product_0"]['distribution_0'].keys()))
+        #print(list(nuc["reactions"]["reaction_002"]["product_0"]["distribution_0"]["angle"]["energy"]))
+        #print(list(nuc["reactions"]["reaction_002"]["product_0"]["distribution_0"]["angle"]["energy"]))
         #print(f"Wrote {name}.bin with {nE} points")
 
+'''with h5.File("hdf5/U238.h5", "r") as f
+    
+    nuc = f["U238"]
+    angle = nuc["reactions"]["reaction_002"]["product_0"]["distribution_0"]["angle"]
+
+    E = np.array(angle["energy"])
+    M = np.array(angle["mu"])
+    offsets = angle["mu"].attrs["offsets"]
+
+    I = [0, 15, 30]
+
+    fig, (ax_pdf, ax_cdf) = plt.subplots(1, 2, figsize=(11, 5))
+    for i in I:
+        start = offsets[i]
+        end = offsets[i + 1] if i + 1 < len(offsets) else M.shape[1]
+        mu_vals  = M[0, start:end]
+        pdf_vals = M[1, start:end]
+        cdf_vals = M[2, start:end]
+        label = f'{E[i]:.2e} eV'
+        ax_pdf.plot(mu_vals, pdf_vals, label=label)
+        ax_cdf.plot(mu_vals, cdf_vals, label=label)
+
+    ax_pdf.set_xlabel(r'$\mu_\mathrm{CM}$')
+    ax_pdf.legend(fontsize=7)
+
+    ax_cdf.set_xlabel(r'$\mu_\mathrm{CM}$')
+    ax_cdf.legend(fontsize=7)
+
+    plt.tight_layout()
+    plt.savefig("angular_distribution.png", dpi=300, bbox_inches="tight")
+    plt.show()
+    '''
+
+    
