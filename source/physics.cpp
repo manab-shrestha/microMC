@@ -138,3 +138,34 @@ void rotate_dir(double &Omega_x, double &Omega_y, double &Omega_z, double mu,
   Omega_y /= norm;
   Omega_z /= norm;
 };
+
+int stoch_energy_interp(const int *energy_offsets, const double *energies,
+                        int dist_id, double E, RNG &rng) {
+  int first = energy_offsets[dist_id];
+  int last = energy_offsets[dist_id + 1];
+  int n = last - first;
+
+  if (n <= 1)
+    return first;
+
+  int i = binary_search(energies + first, n, E);
+  if (i >= n - 1)
+    i = n - 2;
+
+  double E_lo = energies[first + i];
+  double E_hi = energies[first + i + 1];
+  double f = (E_hi > E_lo) ? (E - E_lo) / (E_hi - E_lo) : 0.0;
+
+  return (uniform(rng) < f) ? (first + i + 1) : (first + i);
+}
+
+double sample_cosine(const AngularDistPool &pool, int dist_id, double E,
+                     RNG &rng) {
+  int j = stoch_energy_interp(pool.energy_offsets, pool.energies, dist_id, E,
+                              rng);
+
+  int start = pool.table_offsets[j];
+  int n = pool.table_offsets[j + 1] - pool.table_offsets[j];
+
+  return sample_tab_cdf(pool.mu + start, pool.cdf + start, n, rng);
+}
