@@ -1,59 +1,24 @@
-#ifndef MATERIAL_HPP
-#define MATERIAL_HPP
+#ifndef MATERIAL_H
+#define MATERIAL_H
 
-#include "NuclideData.h"
+struct NuclearData; // forward declaration
 
-#include <cstdint>
-#include <utility>
-#include <vector>
-
-struct MaterialComponent {
-    uint64_t offset;
-    double   num_density;
-    uint64_t nE;
-};
+static constexpr int MAX_NUCLIDES_PER_MATERIAL = 16;
 
 struct Material {
-    std::vector<MaterialComponent> components;
+  const char *name;
+  int zaids[MAX_NUCLIDES_PER_MATERIAL]; // physics identity — source of truth
+  double number_densities[MAX_NUCLIDES_PER_MATERIAL]; // atoms/cm³
+  int n_nuclides;
+  int nuclide_ids[MAX_NUCLIDES_PER_MATERIAL]; // resolved indices into
+                                              // NuclearData::nuclides
 };
 
-struct MicroXS {
-    double elastic {0.0};
-    double capture {0.0};
-    double fission {0.0};
-    double total   {0.0};
+// Resolve zaids → nuclide_ids by searching NuclearData.
+// Throws std::runtime_error if any ZAID is not found.
+void resolve_material(Material &mat, const NuclearData &data);
 
-    MicroXS& operator+=(const MicroXS& rhs) {
-        elastic += rhs.elastic;
-        capture += rhs.capture;
-        fission += rhs.fission;
-        total   += rhs.total;
-        return *this;
-    }
-
-    MicroXS& operator*=(double s) {
-        elastic *= s;
-        capture *= s;
-        fission *= s;
-        total   *= s;
-        return *this;
-    }
-
-    friend MicroXS operator+(MicroXS lhs, const MicroXS& rhs) { return lhs += rhs; }
-    friend MicroXS operator*(MicroXS lhs, double s)           { return lhs *= s;   }
-    friend MicroXS operator*(double s, MicroXS rhs)           { return rhs *= s;   }
-};
-
-struct MacroXS {
-    double elastic {0.0};
-    double capture {0.0};
-    double fission {0.0};
-    double total   {0.0};
-};
-
-Material material_factory(const std::vector<std::pair<int,double>>& composition,
-                       const NuclideTable& table);
-
-MacroXS getMacroXS(const NuclideTable& table, const Material& mat, double energy);
+// Total macroscopic cross section (cm^-1) at energy E (eV).
+double total_macro_xs(const Material &mat, const NuclearData &data, double E);
 
 #endif

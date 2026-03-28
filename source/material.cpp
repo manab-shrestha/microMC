@@ -1,64 +1,34 @@
 #include "Material.h"
+#include "NuclearData.h"
+#include "physics.h"
 
-#include <algorithm>
 #include <stdexcept>
 #include <string>
 
-Material material_factory(const std::vector<std::pair<int,double>>& composition,
-                       const NuclideTable& table) {
-    Material mat;
-    for (const auto& comp : composition) {
-        int    ZAID         {comp.first};
-        double num_density {comp.second};
-
-        int index = -1;
-        for (std::size_t i = 0; i < table.ZAIDs.size(); ++i) {
-            if (table.ZAIDs[i] == ZAID) {
-                index = static_cast<int>(i);
+void resolve_material(Material& mat, const NuclearData& data) {
+    for (int i = 0; i < mat.n_nuclides; ++i) {
+        int zaid = mat.zaids[i];
+        bool found = false;
+        for (int j = 0; j < data.n_nuclides; ++j) {
+            if (data.nuclides[j].zaid == zaid) {
+                mat.nuclide_ids[i] = j;
+                found = true;
                 break;
             }
         }
-        if (index == -1) {
-            throw std::runtime_error("ZAID " + std::to_string(ZAID) +
-                                     " not found in NuclideTable.");
-        }
-        mat.components.push_back({table.offsets[index], num_density, table.nE[index]});
+        if (!found)
+            throw std::runtime_error(
+                std::string("Material '") + mat.name + "': ZAID " +
+                std::to_string(zaid) + " not found in nuclear data");
     }
-    return mat;
 }
 
-static MicroXS getMicroXS(uint64_t offset, uint64_t nE, double energy, const NuclideTable& table) {
-    auto start {table.energy.begin() + offset};
-    auto end   {start + nE};
-
-    auto it {std::lower_bound(start, end, energy)};
-
-    if (it == end)   --it;
-    if (it == start) ++it;
-
-    uint64_t hi {it - table.energy.begin()};
-    uint64_t lo {hi - 1};
-
-    double t = (energy - table.energy[lo]) / (table.energy[hi] - table.energy[lo]);
-
-    return {
-        table.elastic[lo] + t * (table.elastic[hi] - table.elastic[lo]),
-        table.capture[lo] + t * (table.capture[hi] - table.capture[lo]),
-        table.fission[lo] + t * (table.fission[hi] - table.fission[lo]),
-        table.total[lo]   + t * (table.total[hi]   - table.total[lo])
-    };
-}
-
-MacroXS getMacroXS(const NuclideTable& table, const Material& mat, double energy) {
-    MacroXS macroxs;
-
-    for (const auto& comp : mat.components) {
-        MicroXS micro = getMicroXS(comp.offset, comp.nE, energy, table);
-        macroxs.elastic += comp.num_density * micro.elastic;
-        macroxs.capture += comp.num_density * micro.capture;
-        macroxs.fission += comp.num_density * micro.fission;
-        macroxs.total   += comp.num_density * micro.total;
+double total_macro_xs(const Material& mat, const NuclearData& data, double E) {
+    double sigma_t = 0.0;
+    for (int i = 0; i < mat.n_nuclides; ++i) {
+        const auto& nuc = data.nuclides[mat.nuclide_ids[i]];
+        for (int r = 0; r < nuc.n_reactions; ++r)
+            sigma_t += mat.number_densities[i] * lookup_xs(data, nuc, data.reactions[nuc.rxn_offset + r], E);
     }
-
-    return macroxs;
+    return sigma_t;
 }

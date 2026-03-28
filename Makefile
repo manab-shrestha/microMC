@@ -9,7 +9,7 @@ SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(BLD_DIR)/%.o, $(SRCS))
 DEPS := $(OBJS:.o=.d)
 
-.PHONY: all clean
+.PHONY: all clean compdb
 
 all: $(TARGET)
 
@@ -26,3 +26,6 @@ $(BLD_DIR):
 
 clean:
 	rm -rf $(BLD_DIR) $(TARGET)
+
+compdb:
+	bear -- $(MAKE) clean all
