@@ -1,15 +1,23 @@
 #include "../include/transport.h"
 #include "../include/physics.h"
 #include "../include/reaction.h"
+#include "Material.h"
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
 
+void event_calc_XS(TransportState &state) {
+  for (auto &n : state.current_bank) {
+    if (!n.alive)
+      continue;
+    n.Sigma_t = total_macro_xs(*state.material, *state.data, n.E);
+  }
+}
+
 void event_advance(TransportState &state) {
   for (auto &n : state.current_bank) {
-    double sigma_t = total_macro_xs(*state.material, *state.data, n.E);
-    double d = -std::log(uniform(state.rng)) / sigma_t;
+    double d = -std::log(uniform(state.rng)) / n.Sigma_t;
     n.x += d * n.Omega_x;
     n.y += d * n.Omega_y;
     n.z += d * n.Omega_z;
@@ -18,8 +26,9 @@ void event_advance(TransportState &state) {
 
 void event_sample_reaction(TransportState &state) {
   for (int i{0}; i < static_cast<int>(state.current_bank.size()); ++i) {
-    state.current_bank[i].rxn = sample_reaction(
-        *state.material, *state.data, state.current_bank[i].E, state.rng);
+    state.current_bank[i].rxn =
+        sample_reaction(*state.material, *state.data, state.current_bank[i].E,
+                        state.current_bank[i].Sigma_t, state.rng);
   }
 }
 
@@ -88,8 +97,7 @@ void score_flux(TransportState &state) {
   for (const auto &neutron : state.current_bank) {
     if (!neutron.alive)
       continue;
-    double sigma_t = total_macro_xs(*state.material, *state.data, neutron.E);
-    double score = neutron.w / sigma_t;
+    double score = neutron.w / neutron.Sigma_t;
     state.tally_file.write(reinterpret_cast<const char *>(&neutron.E),
                            sizeof(double));
     state.tally_file.write(reinterpret_cast<const char *>(&score),
@@ -136,6 +144,7 @@ void run_eigenvalue(const Material &mat, const NuclearData &data,
     state.scoring_active = (c >= n_inactive) && (flux_detector);
 
     while (!state.current_bank.empty()) {
+      event_calc_XS(state);
       event_advance(state);
       event_sample_reaction(state);
       if (state.scoring_active)

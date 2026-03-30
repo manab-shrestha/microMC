@@ -30,7 +30,7 @@ double sample_tab_cdf(const double *x, const double *cdf, int n, RNG &rng);
 
 // Sample a reaction channel proportional to macroscopic XS at energy E
 ReactionSample sample_reaction(const Material &mat, const NuclearData &data,
-                               double E, RNG &rng);
+                               double E, double Sigma_t, RNG &rng);
 
 struct KalbachResult {
   double E_out;

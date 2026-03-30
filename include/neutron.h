@@ -16,6 +16,7 @@ struct Neutron {
   double w{1.0};
   bool alive{true};
   ReactionSample rxn;
+  double Sigma_t{0.0}; // we cache the cMacroscopic cross section at that energy
 };
 
 using ParticleBank = std::vector<Neutron>;

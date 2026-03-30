@@ -46,8 +46,8 @@ double lookup_xs(const NuclearData &data, const NuclideDescriptor &nuc,
 }
 
 ReactionSample sample_reaction(const Material &mat, const NuclearData &data,
-                               double E, RNG &rng) {
-  double xi = uniform(rng) * total_macro_xs(mat, data, E);
+                               double E, double Sigma_t, RNG &rng) {
+  double xi = uniform(rng) * Sigma_t;
   double cumulative = 0.0;
 
   for (int i = 0; i < mat.n_nuclides; ++i) {
