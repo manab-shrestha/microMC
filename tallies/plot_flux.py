@@ -24,7 +24,7 @@ print(f"Loaded {len(E_micromc)} microMC collision events")
 print(f"Energy range: {E_micromc.min():.3e} – {E_micromc.max():.3e} eV")
 
 # --- Read Serpent detector ---
-det = serpentTools.read("input_det0.m")
+det = serpentTools.read("../serpent/input_det0.m")
 f = det.detectors["flux_serpent"]
 
 Egrid = f.grids["E"]
