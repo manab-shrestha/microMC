@@ -30,6 +30,6 @@ void score_flux(TransportState &state);
 
 void run_eigenvalue(const Material &mat, const NuclearData &data,
                     int n_particles, int n_inactive, int n_active,
-                    uint64_t seed);
+                    uint64_t seed, bool flux_detector);
 
 #endif

@@ -41,10 +41,10 @@ void event_process_collision(TransportState &state) {
       inelastic_scatter_disc(neutron, nuc, rxn, *state.data, state.rng);
       break;
     case RxnType::CONTINUUM_INELASTIC:
-      inelastic_scatter_cont(neutron, nuc, rxn, *state.data, state.rng);
+      inelastic_scatter_cont(neutron, rxn, *state.data, state.rng);
       break;
     case RxnType::FISSION:
-      fission(neutron, nuc, rxn, *state.data, state.fission_bank, state.k_eff,
+      fission(neutron, rxn, *state.data, state.fission_bank, state.k_eff,
               state.rng);
       break;
     case RxnType::ABSORPTION:
@@ -52,7 +52,7 @@ void event_process_collision(TransportState &state) {
       break;
     case RxnType::N2N:
     case RxnType::N3N:
-      multiply(neutron, nuc, rxn, *state.data, state.current_bank, state.rng);
+      multiply(neutron, rxn, *state.data, state.current_bank, state.rng);
       break;
     }
   }
@@ -105,7 +105,7 @@ void event_compact_bank(ParticleBank &bank) {
 
 void run_eigenvalue(const Material &mat, const NuclearData &data,
                     int n_particles, int n_inactive, int n_active,
-                    uint64_t seed) {
+                    uint64_t seed, bool flux_detector) {
   TransportState state;
   state.material = &mat;
   state.data = &data;
@@ -133,7 +133,7 @@ void run_eigenvalue(const Material &mat, const NuclearData &data,
     for (const auto &n : state.current_bank)
       W_source += n.w;
 
-    state.scoring_active = (c >= n_inactive);
+    state.scoring_active = (c >= n_inactive) && (flux_detector);
 
     while (!state.current_bank.empty()) {
       event_advance(state);

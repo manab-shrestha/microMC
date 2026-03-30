@@ -43,8 +43,7 @@ void inelastic_scatter_disc(Neutron &neutron, const NuclideDescriptor &nuc,
   neutron.E = E_out;
 }
 
-void inelastic_scatter_cont(Neutron &neutron, const NuclideDescriptor &nuc,
-                            const ReactionDescriptor &rxn,
+void inelastic_scatter_cont(Neutron &neutron, const ReactionDescriptor &rxn,
                             const NuclearData &data, RNG &rng) {
 
   KalbachResult kalbach_res =
@@ -55,9 +54,9 @@ void inelastic_scatter_cont(Neutron &neutron, const NuclideDescriptor &nuc,
   neutron.E = kalbach_res.E_out;
 }
 
-void fission(Neutron &neutron, const NuclideDescriptor &nuc,
-             const ReactionDescriptor &rxn, const NuclearData &data,
-             ParticleBank &fission_bank, double k_eff, RNG &rng) {
+void fission(Neutron &neutron, const ReactionDescriptor &rxn,
+             const NuclearData &data, ParticleBank &fission_bank, double k_eff,
+             RNG &rng) {
 
   const int nu =
       sample_nu_bar(data.fission_yields, rxn.yield_id, neutron.E, rng);
@@ -79,9 +78,8 @@ void fission(Neutron &neutron, const NuclideDescriptor &nuc,
 
 void capture(Neutron &neutron) { neutron.alive = false; }
 
-void multiply(Neutron &neutron, const NuclideDescriptor &nuc,
-              const ReactionDescriptor &rxn, const NuclearData &data,
-              ParticleBank &current_bank, RNG &rng) {
+void multiply(Neutron &neutron, const ReactionDescriptor &rxn,
+              const NuclearData &data, ParticleBank &current_bank, RNG &rng) {
 
   double E_inc = neutron.E; // save incident energy before modification
 
@@ -89,8 +87,8 @@ void multiply(Neutron &neutron, const NuclideDescriptor &nuc,
   KalbachResult kalbach_res =
       sample_kalbach_mann(data.kalbach, rxn.dist_id, E_inc, rng);
   neutron.E = kalbach_res.E_out;
-  rotate_dir(neutron.Omega_x, neutron.Omega_y, neutron.Omega_z,
-             kalbach_res.mu, rng);
+  rotate_dir(neutron.Omega_x, neutron.Omega_y, neutron.Omega_z, kalbach_res.mu,
+             rng);
 
   // Create multiplicity - 1 secondaries (sampled from original incident energy)
   for (int i = 0; i < rxn.multiplicity - 1; ++i) {
