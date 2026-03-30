@@ -1,0 +1,9 @@
+*.md
+!CLAUDE.md
+!BOTTLENECKS.md
+tallies/*.bin
+.DS_Store
+build/*
+!build/.gitkeep
+*.png
+*.jpeg

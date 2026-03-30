@@ -1,0 +1,33 @@
+set title "MICROMC VALIDATION"
+
+% --- Define materials --- %
+mat fuel  -10.4  tmp 900
+1001.09c  0.49304
+8016.09c  0.34616
+92235.09c  0.00568
+92238.90c  0.15412
+
+% --- Define geometry --- %
+surf s1 sqc 0.0 0.0 100.0
+cell c1 0 fuel   -s1
+cell c2 0 outside s1
+
+% --- Reflective boundary conditions --- %
+set bc 2
+
+% --- Neutron population and criticality cycles:
+ 
+set pop 10000 100 20
+
+% --- Cross section library file path: 
+set acelib "/usr/software/mcnplib/SERPENT/XSdata_endfb7/sss_endfb7u.xsdata"
+
+% --- Normalisation --- %
+set flux 1
+
+% --- Detectors --- %
+% --- Energy Groups --- %
+ene 1 4 wms172
+
+det flux_serpent dm fuel de 1
+
