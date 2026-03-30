@@ -1,7 +1,7 @@
-#include "physics.h"
-#include "Material.h"
-#include "NuclearData.h"
-#include "rng.h"
+#include "../include/physics.h"
+#include "../include/Material.h"
+#include "../include/NuclearData.h"
+#include "../include/rng.h"
 #include <algorithm>
 #include <cmath>
 
@@ -161,11 +161,83 @@ int stoch_energy_interp(const int *energy_offsets, const double *energies,
 
 double sample_cosine(const AngularDistPool &pool, int dist_id, double E,
                      RNG &rng) {
-  int j = stoch_energy_interp(pool.energy_offsets, pool.energies, dist_id, E,
-                              rng);
+  int j =
+      stoch_energy_interp(pool.energy_offsets, pool.energies, dist_id, E, rng);
 
   int start = pool.table_offsets[j];
   int n = pool.table_offsets[j + 1] - pool.table_offsets[j];
 
   return sample_tab_cdf(pool.mu + start, pool.cdf + start, n, rng);
+}
+
+KalbachResult sample_kalbach_mann(const KalbachMannDistPool &pool, int dist_id,
+                                  double E, RNG &rng) {
+  int j =
+      stoch_energy_interp(pool.energy_offsets, pool.energies, dist_id, E, rng);
+
+  int start = pool.table_offsets[j];
+  int n = pool.table_offsets[j + 1] - pool.table_offsets[j];
+
+  // Inline CDF sampling so we keep the bin index for r/a interpolation
+  double xi = uniform(rng);
+  int idx = binary_search(pool.cdf + start, n, xi);
+  if (idx >= n - 1)
+    idx = n - 2;
+
+  double denom = pool.cdf[start + idx + 1] - pool.cdf[start + idx];
+  double t = (denom > 0.0) ? (xi - pool.cdf[start + idx]) / denom : 0.0;
+
+  double E_out = pool.E_out[start + idx] +
+                 t * (pool.E_out[start + idx + 1] - pool.E_out[start + idx]);
+  double r =
+      pool.r[start + idx] + t * (pool.r[start + idx + 1] - pool.r[start + idx]);
+  double a =
+      pool.a[start + idx] + t * (pool.a[start + idx + 1] - pool.a[start + idx]);
+
+  // Sample mu from Kalbach-Mann
+  double xi_2 = uniform(rng);
+  double mu;
+  if (std::abs(a) < 1e-8) {
+    // Isotropic limit when a -> 0
+    mu = 2.0 * xi_2 - 1.0;
+  } else {
+    double B = (1 - r) * std::exp(a) - (1 + r) * std::exp(-a) -
+               4 * xi_2 * std::sinh(a);
+    double y = (-B + std::sqrt(B * B + 4 * (1 - r * r))) / (2 * (1 + r));
+    mu = std::clamp(std::log(y) / a, -1.0, 1.0);
+  }
+
+  return {E_out, mu};
+}
+
+double sample_fission_energy(const EnergyDistPool &pool, int dist_id, double E,
+                             RNG &rng) {
+  int j =
+      stoch_energy_interp(pool.energy_offsets, pool.energies, dist_id, E, rng);
+
+  int start = pool.table_offsets[j];
+  int n = pool.table_offsets[j + 1] - pool.table_offsets[j];
+
+  return sample_tab_cdf(pool.E_out + start, pool.cdf + start, n, rng);
+}
+
+int sample_nu_bar(const FissionYieldPool &pool, int yield_id, double E,
+                  RNG &rng) {
+  const FissionYieldDescriptor &desc = pool.descriptors[yield_id];
+  int offset = desc.offset;
+  int n = desc.n_points;
+
+  int i = binary_search(pool.energy + offset, n, E);
+  if (i >= n - 1)
+    i = n - 2;
+
+  double t = (E - pool.energy[offset + i]) /
+             (pool.energy[offset + i + 1] - pool.energy[offset + i]);
+  double nu_bar = pool.nu_bar[offset + i] +
+                  t * (pool.nu_bar[offset + i + 1] - pool.nu_bar[offset + i]);
+
+  int nu = static_cast<int>(nu_bar);
+  if (uniform(rng) < (nu_bar - nu))
+    nu += 1;
+  return nu;
 }

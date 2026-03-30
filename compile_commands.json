@@ -1,5 +1,6 @@
 [
   {
+    "file": "source/main.cpp",
     "arguments": [
       "/usr/bin/g++",
       "-std=c++17",
@@ -8,16 +9,18 @@
       "-O2",
       "-I",
       "include",
+      "-MMD",
+      "-MP",
       "-c",
+      "source/main.cpp",
       "-o",
-      "build/main.o",
-      "source/main.cpp"
+      "build/main.o"
     ],
-    "directory": "/home/ms3281/micromc",
-    "file": "/home/ms3281/micromc/source/main.cpp",
-    "output": "/home/ms3281/micromc/build/main.o"
+    "directory": "/Users/shrestha/micromc",
+    "output": "build/main.o"
   },
   {
+    "file": "source/material.cpp",
     "arguments": [
       "/usr/bin/g++",
       "-std=c++17",
@@ -26,16 +29,18 @@
       "-O2",
       "-I",
       "include",
+      "-MMD",
+      "-MP",
       "-c",
+      "source/material.cpp",
       "-o",
-      "build/material.o",
-      "source/material.cpp"
+      "build/material.o"
     ],
-    "directory": "/home/ms3281/micromc",
-    "file": "/home/ms3281/micromc/source/material.cpp",
-    "output": "/home/ms3281/micromc/build/material.o"
+    "directory": "/Users/shrestha/micromc",
+    "output": "build/material.o"
   },
   {
+    "file": "source/nuclear_data.cpp",
     "arguments": [
       "/usr/bin/g++",
       "-std=c++17",
@@ -44,16 +49,18 @@
       "-O2",
       "-I",
       "include",
+      "-MMD",
+      "-MP",
       "-c",
+      "source/nuclear_data.cpp",
       "-o",
-      "build/nuclear_data.o",
-      "source/nuclear_data.cpp"
+      "build/nuclear_data.o"
     ],
-    "directory": "/home/ms3281/micromc",
-    "file": "/home/ms3281/micromc/source/nuclear_data.cpp",
-    "output": "/home/ms3281/micromc/build/nuclear_data.o"
+    "directory": "/Users/shrestha/micromc",
+    "output": "build/nuclear_data.o"
   },
   {
+    "file": "source/physics.cpp",
     "arguments": [
       "/usr/bin/g++",
       "-std=c++17",
@@ -62,13 +69,14 @@
       "-O2",
       "-I",
       "include",
+      "-MMD",
+      "-MP",
       "-c",
+      "source/physics.cpp",
       "-o",
-      "build/physics.o",
-      "source/physics.cpp"
+      "build/physics.o"
     ],
-    "directory": "/home/ms3281/micromc",
-    "file": "/home/ms3281/micromc/source/physics.cpp",
-    "output": "/home/ms3281/micromc/build/physics.o"
+    "directory": "/Users/shrestha/micromc",
+    "output": "build/physics.o"
   }
 ]
