@@ -1,8 +1,6 @@
-#ifndef NEUTRON_H
-#define NEUTRON_H
+#pragma once
 
-#include "physics.h"
-#include <NuclearData.h>
+#include "nuclear_data.h"
 #include <vector>
 
 struct Neutron {
@@ -14,11 +12,9 @@ struct Neutron {
   double Omega_y{0.0};
   double Omega_z{0.0};
   double w{1.0};
+  double macro_xs_t{0.0}; // cached macroscopic total cross section
   bool alive{true};
   ReactionSample rxn;
-  double Sigma_t{0.0}; // we cache the cMacroscopic cross section at that energy
 };
 
 using ParticleBank = std::vector<Neutron>;
-
-#endif

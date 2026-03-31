@@ -1,10 +1,10 @@
-#include "../include/reaction.h"
-#include "../include/physics.h"
+#include "reaction.h"
+#include "direction.h"
+#include "sampling.h"
 #include <cmath>
 
 void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
                      const NuclearData &data, RNG &rng) {
-
   double A = nuc.A;
   const ReactionDescriptor &rxn = data.reactions[nuc.rxn_offset];
 
@@ -20,7 +20,6 @@ void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
 void inelastic_scatter_disc(Neutron &neutron, const NuclideDescriptor &nuc,
                             const ReactionDescriptor &rxn,
                             const NuclearData &data, RNG &rng) {
-
   double A = nuc.A;
   double Q = rxn.Q_value;
 
@@ -45,19 +44,17 @@ void inelastic_scatter_disc(Neutron &neutron, const NuclideDescriptor &nuc,
 
 void inelastic_scatter_cont(Neutron &neutron, const ReactionDescriptor &rxn,
                             const NuclearData &data, RNG &rng) {
-
-  KalbachResult kalbach_res =
+  KalbachResult result =
       sample_kalbach_mann(data.kalbach, rxn.dist_id, neutron.E, rng);
 
-  rotate_dir(neutron.Omega_x, neutron.Omega_y, neutron.Omega_z, kalbach_res.mu,
+  rotate_dir(neutron.Omega_x, neutron.Omega_y, neutron.Omega_z, result.mu,
              rng);
-  neutron.E = kalbach_res.E_out;
+  neutron.E = result.E_out;
 }
 
 void fission(Neutron &neutron, const ReactionDescriptor &rxn,
              const NuclearData &data, ParticleBank &fission_bank, double k_eff,
              RNG &rng) {
-
   const int nu =
       sample_nu_bar(data.fission_yields, rxn.yield_id, neutron.E, rng);
 
@@ -79,18 +76,17 @@ void fission(Neutron &neutron, const ReactionDescriptor &rxn,
 void capture(Neutron &neutron) { neutron.alive = false; }
 
 void multiply(Neutron &neutron, const ReactionDescriptor &rxn,
-              const NuclearData &data, ParticleBank &current_bank, RNG &rng) {
-
-  double E_inc = neutron.E; // save incident energy before modification
+              const NuclearData &data, ParticleBank &secondary_bank, RNG &rng) {
+  double E_inc = neutron.E;
 
   // Update original neutron with first Kalbach sample
-  KalbachResult kalbach_res =
+  KalbachResult result =
       sample_kalbach_mann(data.kalbach, rxn.dist_id, E_inc, rng);
-  neutron.E = kalbach_res.E_out;
-  rotate_dir(neutron.Omega_x, neutron.Omega_y, neutron.Omega_z, kalbach_res.mu,
+  neutron.E = result.E_out;
+  rotate_dir(neutron.Omega_x, neutron.Omega_y, neutron.Omega_z, result.mu,
              rng);
 
-  // Create multiplicity - 1 secondaries (sampled from original incident energy)
+  // Create multiplicity - 1 secondaries from original incident energy
   for (int i = 0; i < rxn.multiplicity - 1; ++i) {
     Neutron secondary;
     secondary.x = neutron.x;
@@ -98,12 +94,13 @@ void multiply(Neutron &neutron, const ReactionDescriptor &rxn,
     secondary.z = neutron.z;
     secondary.w = neutron.w;
 
-    KalbachResult sec_kalbach =
+    KalbachResult sec_result =
         sample_kalbach_mann(data.kalbach, rxn.dist_id, E_inc, rng);
-    sample_isodir(secondary.Omega_x, secondary.Omega_y, secondary.Omega_z, rng);
+    sample_isodir(secondary.Omega_x, secondary.Omega_y, secondary.Omega_z,
+                  rng);
     rotate_dir(secondary.Omega_x, secondary.Omega_y, secondary.Omega_z,
-               sec_kalbach.mu, rng);
-    secondary.E = sec_kalbach.E_out;
-    current_bank.push_back(secondary);
+               sec_result.mu, rng);
+    secondary.E = sec_result.E_out;
+    secondary_bank.push_back(secondary);
   }
 }

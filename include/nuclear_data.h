@@ -1,5 +1,4 @@
-#ifndef NUCLEAR_DATA_H
-#define NUCLEAR_DATA_H
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -27,7 +26,7 @@ struct NuclideDescriptor {
 };
 
 struct ReactionDescriptor {
-  int type;      // RxnType as int
+  RxnType type;
   int xs_offset; // into xs_pool
   int xs_length;
   int threshold_idx; // index into nuclide energy grid where xs[0] begins
@@ -111,8 +110,6 @@ struct NuclearData {
 };
 
 // ── Host-side owning container ─────────────────────────────────────
-// Holds std::vectors that own the memory. The NuclearData struct above
-// points into these vectors.
 
 struct NuclearDataHost {
   std::vector<NuclideDescriptor> nuclides;
@@ -152,7 +149,6 @@ struct NuclearDataHost {
   std::vector<double> fy_energy;
   std::vector<double> fy_nu_bar;
 
-  // Build a NuclearData view pointing into this container's data
   NuclearData view() const;
 };
 
@@ -160,6 +156,12 @@ struct NuclearDataHost {
 NuclearDataHost load_nuclear_data(const std::string &path);
 
 // Human-readable name for a RxnType value
-const char *rxn_type_name(int type);
+const char *rxn_type_name(RxnType type);
 
-#endif
+// ── Result of reaction sampling ────────────────────────────────────
+
+struct ReactionSample {
+  int nuclide_idx;  // index into NuclearData::nuclides[]
+  int rxn_idx;      // index into NuclearData::reactions[]
+  RxnType type;     // reaction type for transport dispatch
+};

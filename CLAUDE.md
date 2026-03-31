@@ -10,7 +10,7 @@ make clean    # remove build/ and binary
 ./micromc     # run (requires xs/bin/nuclear_data.bin to exist)
 ```
 
-The Makefile compiles all `source/*.cpp` with C++17 (`-std=c++17 -Wall -Wextra -O2 -I include`), linking into `./micromc`. Object and dependency files go in `build/`.
+The Makefile compiles all `source/*.cpp` with C++17 (`-std=c++17 -Wall -Wextra -O3 -march=native -ffast-math -I include`), linking into `./micromc`. Object and dependency files go in `build/`.
 
 ## Nuclear data pipeline
 
@@ -30,8 +30,29 @@ The codebase is structured around a flat, SoA-friendly nuclear data representati
 
 **Data flow:**
 1. `xs/extract_hdf5.py` — reads OpenMC HDF5 files and writes a single flat binary blob
-2. `source/NuclearData.cpp` + `include/NuclearData.h` — binary loader; produces `NuclearDataHost` (std::vector owner) and `NuclearData` (raw-pointer view into it, device-compatible)
-3. `source/main.cpp` — loads data, queries macroscopic XS, currently exercises the data structures
+2. `source/nuclear_data.cpp` + `include/nuclear_data.h` — binary loader; produces `NuclearDataHost` (std::vector owner) and `NuclearData` (raw-pointer view into it, device-compatible)
+3. `source/main.cpp` — loads data, sets up material, runs eigenvalue calculation
+
+**Source file layout:**
+| File | Purpose |
+|---|---|
+| `nuclear_data.{h,cpp}` | Data structures, binary loader, `NuclearData`/`NuclearDataHost` |
+| `xs_lookup.{h,cpp}` | Binary search, `GridIndex`, `lookup_micro_xs`, `lookup_micro_xs_at` |
+| `material.{h,cpp}` | `Material` struct, density conversion, `total_macro_xs` |
+| `sampling.{h,cpp}` | CDF sampling, angular/Kalbach/fission distributions, `sample_reaction` |
+| `direction.{h,cpp}` | `sample_isodir`, `rotate_dir` (direction sampling/rotation) |
+| `neutron.h` | `Neutron` struct, `ParticleBank` typedef |
+| `reaction.{h,cpp}` | Collision handlers: elastic, inelastic, fission, capture, multiply |
+| `transport.{h,cpp}` | Event loop, eigenvalue driver, bank management |
+| `atomic_mass.{h,cpp}` | ENDF/B-VII.1 atomic mass table lookup |
+| `rng.h` | RNG type alias and `uniform()` |
+
+**Naming conventions:**
+- Types/structs: PascalCase (`NuclearData`, `GridIndex`)
+- Functions/variables: snake_case (`total_macro_xs`, `sample_reaction`)
+- Macroscopic cross sections: `macro_xs_*` (e.g. `macro_xs_t` for total)
+- Microscopic cross sections: `micro_xs_*` or `lookup_micro_xs*`
+- Headers use `#pragma once`, all lowercase filenames
 
 **Key design decisions:**
 - `NuclearData` is a pure-POD view struct (no std:: types) so it can be copied to GPU device memory unchanged. `NuclearDataHost` owns the heap via `std::vector`; `host.view()` returns a `NuclearData` pointing into those vectors.

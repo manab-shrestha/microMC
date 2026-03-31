@@ -1,8 +1,7 @@
-#ifndef TRANSPORT_H
-#define TRANSPORT_H
+#pragma once
 
-#include "Material.h"
-#include "NuclearData.h"
+#include "material.h"
+#include "nuclear_data.h"
 #include "neutron.h"
 #include "rng.h"
 #include <cstdint>
@@ -22,6 +21,7 @@ struct TransportState {
   bool scoring_active{false};
 };
 
+void event_calc_xs(TransportState &state);
 void event_advance(TransportState &state);
 void event_sample_reaction(TransportState &state);
 void event_process_collision(TransportState &state);
@@ -31,5 +31,3 @@ void score_flux(TransportState &state);
 void run_eigenvalue(const Material &mat, const NuclearData &data,
                     int n_particles, int n_inactive, int n_active,
                     uint64_t seed, bool flux_detector);
-
-#endif

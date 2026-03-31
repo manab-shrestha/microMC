@@ -1,13 +1,9 @@
-build/reaction.o: source/reaction.cpp source/../include/reaction.h \
-  source/../include/../include/NuclearData.h \
-  source/../include/../include/neutron.h \
-  source/../include/../include/physics.h \
-  source/../include/../include/rng.h include/NuclearData.h \
-  source/../include/physics.h
-source/../include/reaction.h:
-source/../include/../include/NuclearData.h:
-source/../include/../include/neutron.h:
-source/../include/../include/physics.h:
-source/../include/../include/rng.h:
-include/NuclearData.h:
-source/../include/physics.h:
+build/reaction.o: source/reaction.cpp include/reaction.h \
+  include/nuclear_data.h include/neutron.h include/rng.h \
+  include/direction.h include/sampling.h
+include/reaction.h:
+include/nuclear_data.h:
+include/neutron.h:
+include/rng.h:
+include/direction.h:
+include/sampling.h:

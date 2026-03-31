@@ -1,8 +1,6 @@
-build/material.o: source/material.cpp include/Material.h \
-  include/atomic_mass.h include/NuclearData.h include/physics.h \
-  include/rng.h
-include/Material.h:
+build/material.o: source/material.cpp include/material.h \
+  include/atomic_mass.h include/nuclear_data.h include/xs_lookup.h
+include/material.h:
 include/atomic_mass.h:
-include/NuclearData.h:
-include/physics.h:
-include/rng.h:
+include/nuclear_data.h:
+include/xs_lookup.h:
