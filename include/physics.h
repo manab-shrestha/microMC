@@ -6,12 +6,23 @@
 
 struct Material;
 
+struct GridIndex {
+  int i;
+  double t;
+};
+
+GridIndex find_grid_index(const NuclearData &data, const NuclideDescriptor &nuc,
+                          double E);
+
 // Returns index of largest element <= value in arr[0..n-1]
 int binary_search(const double *arr, int n, double value);
 
 // Linearly interpolated microscopic XS (barn) at energy E
 double lookup_xs(const NuclearData &data, const NuclideDescriptor &nuc,
                  const ReactionDescriptor &rxn, double E);
+
+double lookup_xs_improved(const NuclearData &data,
+                          const ReactionDescriptor &rxn, GridIndex &gi);
 
 // Result of reaction sampling
 struct ReactionSample {

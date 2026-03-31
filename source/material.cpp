@@ -123,9 +123,11 @@ double total_macro_xs(const Material &mat, const NuclearData &data, double E) {
   double sigma_t = 0.0;
   for (int i = 0; i < mat.n_nuclides; ++i) {
     const auto &nuc = data.nuclides[mat.nuclide_ids[i]];
+    GridIndex gi = find_grid_index(data, nuc, E);
     for (int r = 0; r < nuc.n_reactions; ++r)
-      sigma_t += mat.number_densities[i] *
-                 lookup_xs(data, nuc, data.reactions[nuc.rxn_offset + r], E);
+      sigma_t +=
+          mat.number_densities[i] *
+          lookup_xs_improved(data, data.reactions[nuc.rxn_offset + r], gi);
   }
   return sigma_t;
 }

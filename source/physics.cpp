@@ -23,6 +23,29 @@ int binary_search(const double *arr, int n, double value) {
   return lo;
 }
 
+GridIndex find_grid_index(const NuclearData &data, const NuclideDescriptor &nuc,
+                          double E) {
+  const double *E_grid = data.energy_grids + nuc.grid_offset;
+  int n = nuc.grid_length;
+  int i = binary_search(E_grid, n, E);
+  if (i >= n - 1)
+    i = n - 2;
+  double t = (E - E_grid[i]) / (E_grid[i + 1] - E_grid[i]);
+  return {i, t};
+}
+
+double lookup_xs_improved(const NuclearData &data,
+                          const ReactionDescriptor &rxn, GridIndex &gi) {
+  int j = gi.i - rxn.threshold_idx;
+  if (j < 0)
+    return 0.0;
+  if (j >= rxn.xs_length - 1)
+    return data.xs_pool[rxn.xs_offset + rxn.xs_length - 1];
+  double xs_lo = data.xs_pool[rxn.xs_offset + j];
+  double xs_hi = data.xs_pool[rxn.xs_offset + j + 1];
+  return xs_lo + gi.t * (xs_hi - xs_lo);
+}
+
 double lookup_xs(const NuclearData &data, const NuclideDescriptor &nuc,
                  const ReactionDescriptor &rxn, double E) {
   const double *E_grid = data.energy_grids + nuc.grid_offset;
@@ -54,10 +77,11 @@ ReactionSample sample_reaction(const Material &mat, const NuclearData &data,
     int nid = mat.nuclide_ids[i];
     const auto &nuc = data.nuclides[nid];
     double N = mat.number_densities[i];
+    GridIndex gi = find_grid_index(data, nuc, E);
 
     for (int r = 0; r < nuc.n_reactions; ++r) {
       const auto &rxn = data.reactions[nuc.rxn_offset + r];
-      cumulative += N * lookup_xs(data, nuc, rxn, E);
+      cumulative += N * lookup_xs_improved(data, rxn, gi);
       if (cumulative >= xi)
         return {nid, nuc.rxn_offset + r, static_cast<RxnType>(rxn.type)};
     }
