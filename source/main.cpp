@@ -2,7 +2,6 @@
 #include "nuclear_data.h"
 #include "transport.h"
 
-#include <chrono>
 #include <iostream>
 
 int main(int argc, char *argv[]) {
