@@ -5,7 +5,8 @@
 #include "rng.h"
 
 void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
-                     const NuclearData &data, RNG &rng);
+                     const ReactionDescriptor &rxn, const NuclearData &data,
+                     RNG &rng);
 
 void inelastic_scatter_disc(Neutron &neutron, const NuclideDescriptor &nuc,
                             const ReactionDescriptor &rxn,

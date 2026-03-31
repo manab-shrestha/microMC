@@ -1,12 +1,14 @@
 #include "reaction.h"
 #include "direction.h"
 #include "sampling.h"
+#include <cassert>
 #include <cmath>
 
 void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
-                     const NuclearData &data, RNG &rng) {
+                     const ReactionDescriptor &rxn, const NuclearData &data,
+                     RNG &rng) {
+  assert(rxn.type == RxnType::ELASTIC);
   double A = nuc.A;
-  const ReactionDescriptor &rxn = data.reactions[nuc.rxn_offset];
 
   double mu_cm = sample_cosine(data.angular, rxn.dist_id, neutron.E, rng);
 
@@ -76,8 +78,11 @@ void fission(Neutron &neutron, const ReactionDescriptor &rxn,
 void capture(Neutron &neutron) { neutron.alive = false; }
 
 void multiply(Neutron &neutron, const ReactionDescriptor &rxn,
-              const NuclearData &data, ParticleBank &secondary_bank, RNG &rng) {
+               const NuclearData &data, ParticleBank &secondary_bank, RNG &rng) {
   double E_inc = neutron.E;
+  double Omega_inc_x = neutron.Omega_x;
+  double Omega_inc_y = neutron.Omega_y;
+  double Omega_inc_z = neutron.Omega_z;
 
   // Update original neutron with first Kalbach sample
   KalbachResult result =
@@ -96,8 +101,9 @@ void multiply(Neutron &neutron, const ReactionDescriptor &rxn,
 
     KalbachResult sec_result =
         sample_kalbach_mann(data.kalbach, rxn.dist_id, E_inc, rng);
-    sample_isodir(secondary.Omega_x, secondary.Omega_y, secondary.Omega_z,
-                  rng);
+    secondary.Omega_x = Omega_inc_x;
+    secondary.Omega_y = Omega_inc_y;
+    secondary.Omega_z = Omega_inc_z;
     rotate_dir(secondary.Omega_x, secondary.Omega_y, secondary.Omega_z,
                sec_result.mu, rng);
     secondary.E = sec_result.E_out;

@@ -25,6 +25,9 @@ const char *rxn_type_name(RxnType type) {
 
 namespace {
 
+constexpr int FILE_MAGIC = 0x4D434442; // "MCDB"
+constexpr int FILE_VERSION = 1;
+
 void read_i32(std::ifstream &f, int &v) {
   f.read(reinterpret_cast<char *>(&v), sizeof(int));
 }
@@ -113,10 +116,25 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
 
   // ── Header ──────────────────────────────────────────────────────
   int n_nuclides, n_reactions, n_energy_points, n_xs_points;
-  read_i32(f, n_nuclides);
-  read_i32(f, n_reactions);
-  read_i32(f, n_energy_points);
-  read_i32(f, n_xs_points);
+  int first_word;
+  read_i32(f, first_word);
+
+  if (first_word == FILE_MAGIC) {
+    int version;
+    read_i32(f, version);
+    if (version != FILE_VERSION)
+      throw std::runtime_error("Unsupported nuclear data version in " + path);
+    read_i32(f, n_nuclides);
+    read_i32(f, n_reactions);
+    read_i32(f, n_energy_points);
+    read_i32(f, n_xs_points);
+  } else {
+    // Backward-compatible path for older files without magic/version.
+    n_nuclides = first_word;
+    read_i32(f, n_reactions);
+    read_i32(f, n_energy_points);
+    read_i32(f, n_xs_points);
+  }
 
   int ang_n_dists, ang_n_energies, ang_n_mu;
   read_i32(f, ang_n_dists);

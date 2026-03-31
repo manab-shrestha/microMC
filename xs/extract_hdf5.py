@@ -16,6 +16,8 @@ from pathlib import Path
 
 TEMP = "900K"
 OUTPUT_DIR = Path("bin")
+FILE_MAGIC = 0x4D434442  # "MCDB"
+FILE_VERSION = 1
 
 # Nuclides to extract, in order. Each entry: (filename, ZAID)
 NUCLIDES = [
@@ -438,6 +440,9 @@ def extract():
 
         # ── Header ───────────────────────────────────────────────────
         # All counts needed to know how much to allocate on load
+
+        write_i32(FILE_MAGIC)
+        write_i32(FILE_VERSION)
 
         write_i32(len(nuclide_descriptors))          # n_nuclides
         write_i32(len(reaction_descriptors))          # n_reactions

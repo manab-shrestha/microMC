@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -O3 -march=native -ffast-math -I include
+CXXFLAGS := -std=c++17 -Wall -Wextra -O3 -DNDEBUG -march=native -ffast-math -flto -I include
 
 TARGET  := micromc
 SRC_DIR := source
@@ -9,7 +9,7 @@ SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(BLD_DIR)/%.o, $(SRCS))
 DEPS := $(OBJS:.o=.d)
 
-.PHONY: all clean compdb
+.PHONY: all clean compdb smoke
 
 all: $(TARGET)
 
@@ -29,3 +29,6 @@ clean:
 
 compdb:
 	bear -- $(MAKE) clean all
+
+smoke: $(TARGET)
+	python3 smoke_test.py

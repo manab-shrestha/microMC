@@ -1,8 +1,8 @@
 #pragma once
 
 #include "material.h"
-#include "nuclear_data.h"
 #include "neutron.h"
+#include "nuclear_data.h"
 #include "rng.h"
 #include <cstdint>
 #include <fstream>
@@ -18,6 +18,7 @@ struct TransportState {
   int cycle;
   std::vector<double> k_eff_history;
   std::ofstream tally_file;
+  std::vector<double> tally_buffer;
   bool scoring_active{false};
 };
 
@@ -28,6 +29,6 @@ void event_process_collision(TransportState &state);
 void event_compact_bank(ParticleBank &bank);
 void score_flux(TransportState &state);
 
-void run_eigenvalue(const Material &mat, const NuclearData &data,
-                    int n_particles, int n_inactive, int n_active,
-                    uint64_t seed, bool flux_detector);
+void run_k_eigenvalue(const Material &mat, const NuclearData &data,
+                      int n_particles, int n_inactive, int n_active,
+                      uint64_t seed, bool flux_detector);

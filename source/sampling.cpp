@@ -3,6 +3,7 @@
 #include "xs_lookup.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace {
 constexpr double KALBACH_ISO_THRESHOLD = 1e-8;
@@ -29,6 +30,11 @@ int stoch_energy_interp(const int *energy_offsets, const double *energies,
 
   if (count <= 1)
     return first;
+
+  if (E <= energies[first])
+    return first;
+  if (E >= energies[last - 1])
+    return last - 1;
 
   int bin = binary_search(energies + first, count, E);
   if (bin >= count - 1)
@@ -108,6 +114,21 @@ int sample_nu_bar(const FissionYieldPool &pool, int yield_id, double E,
   int offset = desc.offset;
   int n_points = desc.n_points;
 
+  if (E <= pool.energy[offset]) {
+    double nu_bar = pool.nu_bar[offset];
+    int nu = static_cast<int>(nu_bar);
+    if (uniform(rng) < (nu_bar - nu))
+      nu += 1;
+    return nu;
+  }
+  if (E >= pool.energy[offset + n_points - 1]) {
+    double nu_bar = pool.nu_bar[offset + n_points - 1];
+    int nu = static_cast<int>(nu_bar);
+    if (uniform(rng) < (nu_bar - nu))
+      nu += 1;
+    return nu;
+  }
+
   int bin = binary_search(pool.energy + offset, n_points, E);
   if (bin >= n_points - 1)
     bin = n_points - 2;
@@ -149,4 +170,43 @@ ReactionSample sample_reaction(const Material &mat, const NuclearData &data,
       data.reactions[last_nuc.rxn_offset + last_nuc.n_reactions - 1];
   return {mat.nuclide_ids[mat.n_nuclides - 1],
           last_nuc.rxn_offset + last_nuc.n_reactions - 1, last_rxn.type};
+}
+
+ReactionChoice sample_reaction_and_macro_xs(const Material &mat,
+                                            const NuclearData &data, double E,
+                                            RNG &rng) {
+  static thread_local std::vector<double> cumulative;
+  static thread_local std::vector<ReactionSample> reaction_map;
+  cumulative.clear();
+  reaction_map.clear();
+
+  double macro_xs_t = 0.0;
+  for (int i = 0; i < mat.n_nuclides; ++i) {
+    int nuclide_idx = mat.nuclide_ids[i];
+    const auto &nuc = data.nuclides[nuclide_idx];
+    double N = mat.number_densities[i];
+    GridIndex gi = find_grid_index(data, nuc, E);
+
+    for (int r = 0; r < nuc.n_reactions; ++r) {
+      int rxn_idx = nuc.rxn_offset + r;
+      const auto &rxn = data.reactions[rxn_idx];
+      double macro = N * lookup_micro_xs_at(data, rxn, gi);
+      if (macro <= 0.0)
+        continue;
+      macro_xs_t += macro;
+      cumulative.push_back(macro_xs_t);
+      reaction_map.push_back({nuclide_idx, rxn_idx, rxn.type});
+    }
+  }
+
+  if (macro_xs_t <= 0.0 || cumulative.empty())
+    return {{0, 0, RxnType::ABSORPTION}, 0.0, false};
+
+  double xi = uniform(rng) * macro_xs_t;
+  auto it = std::lower_bound(cumulative.begin(), cumulative.end(), xi);
+  int idx = static_cast<int>(it - cumulative.begin());
+  if (idx >= static_cast<int>(reaction_map.size()))
+    idx = static_cast<int>(reaction_map.size()) - 1;
+
+  return {reaction_map[idx], macro_xs_t, true};
 }

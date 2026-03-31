@@ -33,16 +33,12 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  auto start = std::chrono::steady_clock::now();
-
-  run_eigenvalue(kryptonite, data, 10000, 20, 100, 123, flux_detector);
-
-  auto end = std::chrono::steady_clock::now();
-  auto elapsed =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-  std::cout << "k-eigenvalue calculation completed in: "
-            << elapsed.count() / 1000.0 << " seconds\n";
+  try {
+    run_k_eigenvalue(kryptonite, data, 10000, 20, 100, 123, flux_detector);
+  } catch (const std::exception &e) {
+    std::cerr << "Fatal: " << e.what() << '\n';
+    return 1;
+  }
 
   return 0;
 }
