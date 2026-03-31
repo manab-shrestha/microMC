@@ -34,6 +34,7 @@ void event_sample_reaction(TransportState &state) {
 
 void event_process_collision(TransportState &state) {
   int n = static_cast<int>(state.current_bank.size());
+  ParticleBank secondaries;
   for (int i = 0; i < n; ++i) {
     Neutron &neutron = state.current_bank[i];
     if (!neutron.alive)
@@ -61,10 +62,12 @@ void event_process_collision(TransportState &state) {
       break;
     case RxnType::N2N:
     case RxnType::N3N:
-      multiply(neutron, rxn, *state.data, state.current_bank, state.rng);
+      multiply(neutron, rxn, *state.data, secondaries, state.rng);
       break;
     }
   }
+  state.current_bank.insert(state.current_bank.end(),
+                            secondaries.begin(), secondaries.end());
 }
 
 void comb_bank(ParticleBank &bank, int n_target, RNG &rng) {
