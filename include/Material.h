@@ -9,9 +9,10 @@ static constexpr int MAX_NUCLIDES_PER_MATERIAL = 16;
 struct Material {
   std::string_view name;
   double density{0.0};
+  double temperature{900.0};
   int zaids[MAX_NUCLIDES_PER_MATERIAL];
   double number_quantity[MAX_NUCLIDES_PER_MATERIAL];
-  int n_nuclides;
+  int n_nuclides{0};
   double number_densities[MAX_NUCLIDES_PER_MATERIAL] = {};
   int nuclide_ids[MAX_NUCLIDES_PER_MATERIAL] = {};
 };

@@ -1,0 +1,155 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage{physics}
+\usepackage{siunitx}
+
+\title{microMC Scattering Physics: Stationary-Target vs Thermal-Motion Kinematics}
+\author{Implementation Note}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Purpose}
+This note summarizes the equations and assumptions used in the current microMC scattering model (stationary target) and the equations needed for a free-gas thermal-motion model (moving target). It is organized by reaction channel to make implementation impact explicit.
+
+\section{Notation}
+\begin{itemize}
+  \item Neutron mass: $m_n$; target mass: $m_t = A m_n$.
+  \item Incident neutron lab velocity: $\vb{v}$, energy $E = \tfrac{1}{2}m_n\norm{\vb{v}}^2$.
+  \item Target lab velocity: $\vb{V}$.
+  \item Relative velocity: $\vb{g} = \vb{v} - \vb{V}$.
+  \item Center-of-mass (CM) velocity:
+  \begin{equation}
+    \vb{V}_{\text{cm}} = \frac{m_n\vb{v} + m_t\vb{V}}{m_n + m_t}.
+  \end{equation}
+  \item Reduced mass: $\mu_r = \dfrac{m_n m_t}{m_n+m_t}$.
+\end{itemize}
+
+\section{Old model (stationary target)}
+Assumption: target is at rest for every collision, i.e. $\vb{V}=\vb{0}$.
+
+\subsection{MT=2 elastic}
+Current microMC uses the standard stationary-target two-body result:
+\begin{equation}
+  \frac{E'}{E} = \frac{A^2 + 2A\mu_{\text{cm}} + 1}{(A+1)^2},
+\end{equation}
+with $\mu_{\text{cm}}=\cos\theta_{\text{cm}}$ sampled from tabulated angular data.
+
+CM-to-lab cosine mapping (as used in code) is:
+\begin{equation}
+  \mu_{\text{lab}} = \frac{A\mu_{\text{cm}}+1}{\sqrt{A^2+2A\mu_{\text{cm}}+1}}.
+\end{equation}
+
+\subsection{MT=51--90 discrete inelastic}
+Current microMC uses a stationary-target $Q$-value two-body form:
+\begin{align}
+  E_{\text{lab,cm}} &= \frac{E}{A+1}, \\
+  E_{\text{cm,out}} &= \frac{AE}{A+1} + Q, \\
+  E' &= E_{\text{lab,cm}} + E_{\text{cm,out}} + 2\mu_{\text{cm}}\sqrt{E_{\text{lab,cm}}E_{\text{cm,out}}}.
+\end{align}
+
+\subsection{MT=91, 16, 17}
+For Kalbach-Mann channels, microMC samples $(E',\mu)$ from tabulated laws and rotates direction about the incident axis. No target-velocity sampling is done.
+
+\section{New model (moving target / free gas)}
+Core change: sample target velocity from thermal distribution and do collision in relative-velocity frame.
+
+\subsection{Target velocity sampling}
+For a nuclide at temperature $T$, each Cartesian component is Gaussian:
+\begin{equation}
+  V_i \sim \mathcal{N}\!\left(0,\,\frac{k_B T}{m_t}\right),\quad i\in\{x,y,z\}.
+\end{equation}
+
+More rigorously for collision physics, one may sample from the collision-rate weighted distribution proportional to
+\begin{equation}
+  f_M(\vb{V})\,\sigma(\norm{\vb{v}-\vb{V}})\,\norm{\vb{v}-\vb{V}},
+\end{equation}
+but the unweighted Maxwellian is often used as a first free-gas upgrade.
+
+\subsection{MT=2 elastic with moving target}
+Algorithmically:
+\begin{enumerate}
+  \item Sample $\vb{V}$.
+  \item Compute $\vb{g}=\vb{v}-\vb{V}$ and unit vector $\hat{\vb{g}}$.
+  \item Sample $(\mu_{\text{cm}},\phi)$ from angular law.
+  \item Rotate $\hat{\vb{g}}$ by $(\mu_{\text{cm}},\phi)$ to get $\hat{\vb{g}}'$.
+  \item Elastic in CM implies $\norm{\vb{g}'}=\norm{\vb{g}}$, so $\vb{g}'=\norm{\vb{g}}\hat{\vb{g}}'$.
+  \item Transform back to lab neutron velocity:
+  \begin{equation}
+    \vb{v}' = \vb{V}_{\text{cm}} + \frac{m_t}{m_n+m_t}\vb{g}'.
+  \end{equation}
+  \item Set
+  \begin{equation}
+    E' = \frac{1}{2}m_n\norm{\vb{v}'}^2,\qquad \hat{\Omega}'=\frac{\vb{v}'}{\norm{\vb{v}'}}.
+  \end{equation}
+\end{enumerate}
+
+\paragraph{Key physics consequence.}
+$E'$ is no longer a deterministic function of only $(E,\mu_{\text{cm}},A)$. Thermal upscatter ($E'>E$) appears naturally at low energies.
+
+\subsection{MT=51--90 discrete inelastic with moving target}
+Use same frame machinery as above, but with inelastic CM energy balance. Let
+\begin{equation}
+  E_{\text{rel,in}} = \frac{1}{2}\mu_r\norm{\vb{g}}^2.
+\end{equation}
+For excitation with $Q<0$, outgoing relative energy is
+\begin{equation}
+  E_{\text{rel,out}} = E_{\text{rel,in}} + Q.
+\end{equation}
+Require $E_{\text{rel,out}}>0$ (otherwise kinematically forbidden). Then
+\begin{equation}
+  \norm{\vb{g}'} = \sqrt{\frac{2E_{\text{rel,out}}}{\mu_r}},
+\end{equation}
+with direction sampled by tabulated angular law, then transform to lab using the same velocity transform as elastic.
+
+\paragraph{Implementation note.}
+If the HDF5 law for these channels is \texttt{energy/type = level}, level-law parameters (threshold/mass-ratio) should be respected; a generic stationary $Q$ formula can mismatch processed data conventions.
+
+\subsection{MT=91 continuum inelastic, MT=16,17 multiplication}
+These channels already provide tabulated secondary laws (Kalbach-Mann) for outgoing energy-angle.
+
+Two possibilities:
+\begin{itemize}
+  \item If sampled distributions are in \textbf{lab frame}, no additional target-motion transform is needed.
+  \item If sampled distributions are in \textbf{CM frame}, apply CM-to-lab transform with moving target (sample $\vb{V}$, construct $\vb{V}_{\text{cm}}$, transform sampled secondary velocity to lab).
+\end{itemize}
+
+Thus, change here is frame-dependent, not automatic.
+
+\section{Channel-by-channel impact summary}
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Channel & Old model & Moving-target change \\
+\midrule
+MT=2 & closed-form $E'/E(A,\mu_{\text{cm}})$ & full velocity-frame kinematics \\
+MT=51--90 & stationary $Q$ two-body formula & relative-energy inelastic + frame transform \\
+MT=91 & tabulated KM sampling & only if KM interpreted in CM \\
+MT=16,17 & tabulated KM sampling & only if KM interpreted in CM \\
+MT=18 & sampled fission spectra & no target-motion kinematics \\
+MT=102--117 & absorption/kill neutron & no change \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Assumption changes from old to new}
+\begin{enumerate}
+  \item \textbf{Old:} target always at rest. \textbf{New:} target velocity sampled from thermal distribution.
+  \item \textbf{Old:} low-energy collisions mostly downscatter. \textbf{New:} detailed balance permits both upscatter and downscatter.
+  \item \textbf{Old:} deterministic $E'$ for elastic given $(E,\mu_{\text{cm}})$. \textbf{New:} stochastic $E'$ due to sampled $\vb{V}$.
+  \item \textbf{Old:} one-step formulas in lab frame. \textbf{New:} sample/scatter in relative frame, transform to lab.
+\end{enumerate}
+
+\section{Practical implementation checklist for microMC}
+\begin{itemize}
+  \item Add target-temperature input per material/nuclide for MB sampling.
+  \item Introduce collision kinematics utility: $(\vb{v},\vb{V},\mu,\phi,Q)\mapsto \vb{v}'$.
+  \item Use this utility in MT=2 and MT=51--90 handlers first (highest thermal impact).
+  \item Preserve existing sampled angular laws ($\mu_{\text{cm}}$) and direction rotation logic.
+  \item Verify with diagnostics: fraction of thermal upscatter events, thermal flux peak recovery, and $k_{\text{eff}}$ shift versus reference.
+\end{itemize}
+
+\end{document}

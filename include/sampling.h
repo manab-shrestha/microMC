@@ -1,5 +1,6 @@
 #pragma once
 
+#include "direction.h"
 #include "nuclear_data.h"
 #include "rng.h"
 
@@ -47,3 +48,13 @@ ReactionSample sample_reaction(const Material &mat, const NuclearData &data,
 ReactionChoice sample_reaction_and_macro_xs(const Material &mat,
                                             const NuclearData &data, double E,
                                             RNG &rng);
+
+// Sample target velocity from Maxwellian at temperature T (K)
+Velocity sample_maxwellian_velocity(double A, double T, RNG &rng);
+
+// Sample target velocity from collision-rate weighted distribution
+// proportional to f_M(V) * sigma_t(v_r) * v_r.
+Velocity sample_weighted_target_velocity(const NuclearData &data,
+                                         int nuclide_idx, double vx_n,
+                                         double vy_n, double vz_n,
+                                         double temperature, RNG &rng);

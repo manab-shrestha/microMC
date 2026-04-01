@@ -1,5 +1,6 @@
 #include "nuclear_data.h"
 
+#include <algorithm>
 #include <fstream>
 #include <stdexcept>
 
@@ -26,7 +27,7 @@ const char *rxn_type_name(RxnType type) {
 namespace {
 
 constexpr int FILE_MAGIC = 0x4D434442; // "MCDB"
-constexpr int FILE_VERSION = 1;
+constexpr int FILE_VERSION = 2;
 
 void read_i32(std::ifstream &f, int &v) {
   f.read(reinterpret_cast<char *>(&v), sizeof(int));
@@ -84,6 +85,20 @@ NuclearData NuclearDataHost::view() const {
   d.fission_energy.total_energy_points = static_cast<int>(fe_energies.size());
   d.fission_energy.total_out_points = static_cast<int>(fe_E_out.size());
 
+  // Delayed fission energy
+  d.delayed_fission_energy.energy_offsets = dfe_energy_offsets.data();
+  d.delayed_fission_energy.energies = dfe_energies.data();
+  d.delayed_fission_energy.table_offsets = dfe_table_offsets.data();
+  d.delayed_fission_energy.E_out = dfe_E_out.data();
+  d.delayed_fission_energy.pdf = dfe_pdf.data();
+  d.delayed_fission_energy.cdf = dfe_cdf.data();
+  d.delayed_fission_energy.n_dists =
+      std::max(0, static_cast<int>(dfe_energy_offsets.size()) - 1);
+  d.delayed_fission_energy.total_energy_points =
+      static_cast<int>(dfe_energies.size());
+  d.delayed_fission_energy.total_out_points =
+      static_cast<int>(dfe_E_out.size());
+
   // Kalbach
   d.kalbach.energy_offsets = km_energy_offsets.data();
   d.kalbach.energies = km_energies.data();
@@ -104,6 +119,11 @@ NuclearData NuclearDataHost::view() const {
   d.fission_yields.n_yields = static_cast<int>(fission_yield_descs.size());
   d.fission_yields.total_points = static_cast<int>(fy_energy.size());
 
+  d.delayed_groups = delayed_groups.data();
+  d.n_delayed_groups = static_cast<int>(delayed_groups.size());
+  d.delayed_fission_descs = delayed_fission_descs.data();
+  d.n_delayed_fission_descs = static_cast<int>(delayed_fission_descs.size());
+
   return d;
 }
 
@@ -116,13 +136,13 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
 
   // ── Header ──────────────────────────────────────────────────────
   int n_nuclides, n_reactions, n_energy_points, n_xs_points;
+  int version = 0;
   int first_word;
   read_i32(f, first_word);
 
   if (first_word == FILE_MAGIC) {
-    int version;
     read_i32(f, version);
-    if (version != FILE_VERSION)
+    if (version > FILE_VERSION)
       throw std::runtime_error("Unsupported nuclear data version in " + path);
     read_i32(f, n_nuclides);
     read_i32(f, n_reactions);
@@ -155,6 +175,16 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
   read_i32(f, fy_n_yields);
   read_i32(f, fy_n_points);
 
+  int dfe_n_dists = 0, dfe_n_energies = 0, dfe_n_out = 0;
+  int n_delayed_groups = 0, n_delayed_fission_descs = 0;
+  if (version >= 2) {
+    read_i32(f, dfe_n_dists);
+    read_i32(f, dfe_n_energies);
+    read_i32(f, dfe_n_out);
+    read_i32(f, n_delayed_groups);
+    read_i32(f, n_delayed_fission_descs);
+  }
+
   // ── Nuclide descriptors ─────────────────────────────────────────
   h.nuclides.resize(n_nuclides);
   for (int i = 0; i < n_nuclides; ++i) {
@@ -181,6 +211,11 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
     read_f64(f, rd.Q_value);
     read_i32(f, rd.multiplicity);
     read_i32(f, rd.yield_id);
+    if (version >= 2) {
+      read_i32(f, rd.delayed_id);
+    } else {
+      rd.delayed_id = -1;
+    }
   }
 
   // ── Fission yield descriptors ───────────────────────────────────
@@ -188,6 +223,20 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
   for (int i = 0; i < fy_n_yields; ++i) {
     read_i32(f, h.fission_yield_descs[i].offset);
     read_i32(f, h.fission_yield_descs[i].n_points);
+  }
+
+  if (version >= 2) {
+    h.delayed_groups.resize(n_delayed_groups);
+    for (int i = 0; i < n_delayed_groups; ++i) {
+      read_i32(f, h.delayed_groups[i].yield_id);
+      read_i32(f, h.delayed_groups[i].dist_id);
+    }
+
+    h.delayed_fission_descs.resize(n_delayed_fission_descs);
+    for (int i = 0; i < n_delayed_fission_descs; ++i) {
+      read_i32(f, h.delayed_fission_descs[i].group_offset);
+      read_i32(f, h.delayed_fission_descs[i].n_groups);
+    }
   }
 
   // ── Double pools ────────────────────────────────────────────────
@@ -205,6 +254,14 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
   read_f64_vec(f, h.fe_E_out, fe_n_out);
   read_f64_vec(f, h.fe_pdf, fe_n_out);
   read_f64_vec(f, h.fe_cdf, fe_n_out);
+
+  // Delayed fission energy
+  if (version >= 2) {
+    read_f64_vec(f, h.dfe_energies, dfe_n_energies);
+    read_f64_vec(f, h.dfe_E_out, dfe_n_out);
+    read_f64_vec(f, h.dfe_pdf, dfe_n_out);
+    read_f64_vec(f, h.dfe_cdf, dfe_n_out);
+  }
 
   // Kalbach
   read_f64_vec(f, h.km_energies, km_n_energies);
@@ -224,6 +281,11 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
 
   read_i32_vec(f, h.fe_energy_offsets, fe_n_dists + 1);
   read_i32_vec(f, h.fe_table_offsets, fe_n_energies + 1);
+
+  if (version >= 2) {
+    read_i32_vec(f, h.dfe_energy_offsets, dfe_n_dists + 1);
+    read_i32_vec(f, h.dfe_table_offsets, dfe_n_energies + 1);
+  }
 
   read_i32_vec(f, h.km_energy_offsets, km_n_dists + 1);
   read_i32_vec(f, h.km_table_offsets, km_n_energies + 1);

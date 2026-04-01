@@ -4,7 +4,6 @@
 #include "neutron.h"
 #include "nuclear_data.h"
 #include "rng.h"
-#include <cstdint>
 #include <fstream>
 #include <vector>
 
@@ -28,7 +27,8 @@ void event_sample_reaction(TransportState &state);
 void event_process_collision(TransportState &state);
 void event_compact_bank(ParticleBank &bank);
 void score_flux(TransportState &state);
-
-void run_k_eigenvalue(const Material &mat, const NuclearData &data,
-                      int n_particles, int n_inactive, int n_active,
-                      uint64_t seed, bool flux_detector);
+void comb_bank(ParticleBank &bank, int n_target, RNG &rng);
+void init_source(TransportState &state, int n_particles, bool fixed_source,
+                 const double FIXED_SOURCE_ENERGY);
+void transport_cycle(TransportState &state);
+void flush_tally_buffer(TransportState &state);

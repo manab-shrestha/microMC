@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -35,11 +34,22 @@ struct ReactionDescriptor {
   int multiplicity; // 1 for most; 2 for (n,2n); 3 for (n,3n); -1 for fission
                     // (energy-dep nu)
   int yield_id;     // into fission_yields (-1 if not fission)
+  int delayed_id;   // into delayed fission descriptors (-1 if none)
 };
 
 struct FissionYieldDescriptor {
   int offset; // into fission yield energy/nu_bar arrays
   int n_points;
+};
+
+struct DelayedNeutronGroupDescriptor {
+  int yield_id; // into fission_yields pool
+  int dist_id;  // into delayed fission energy pool
+};
+
+struct DelayedFissionDescriptor {
+  int group_offset; // into delayed neutron groups
+  int n_groups;
 };
 
 // ── Distribution pools (POD, flat arrays) ──────────────────────────
@@ -105,8 +115,14 @@ struct NuclearData {
 
   AngularDistPool angular;
   EnergyDistPool fission_energy;
+  EnergyDistPool delayed_fission_energy;
   KalbachMannDistPool kalbach;
   FissionYieldPool fission_yields;
+
+  const DelayedNeutronGroupDescriptor *delayed_groups;
+  int n_delayed_groups;
+  const DelayedFissionDescriptor *delayed_fission_descs;
+  int n_delayed_fission_descs;
 };
 
 // ── Host-side owning container ─────────────────────────────────────
@@ -135,6 +151,14 @@ struct NuclearDataHost {
   std::vector<double> fe_pdf;
   std::vector<double> fe_cdf;
 
+  // Delayed fission energy pool
+  std::vector<int> dfe_energy_offsets;
+  std::vector<double> dfe_energies;
+  std::vector<int> dfe_table_offsets;
+  std::vector<double> dfe_E_out;
+  std::vector<double> dfe_pdf;
+  std::vector<double> dfe_cdf;
+
   // Kalbach pool
   std::vector<int> km_energy_offsets;
   std::vector<double> km_energies;
@@ -149,6 +173,10 @@ struct NuclearDataHost {
   std::vector<double> fy_energy;
   std::vector<double> fy_nu_bar;
 
+  // Delayed fission metadata
+  std::vector<DelayedNeutronGroupDescriptor> delayed_groups;
+  std::vector<DelayedFissionDescriptor> delayed_fission_descs;
+
   NuclearData view() const;
 };
 
@@ -161,7 +189,7 @@ const char *rxn_type_name(RxnType type);
 // ── Result of reaction sampling ────────────────────────────────────
 
 struct ReactionSample {
-  int nuclide_idx;  // index into NuclearData::nuclides[]
-  int rxn_idx;      // index into NuclearData::reactions[]
-  RxnType type;     // reaction type for transport dispatch
+  int nuclide_idx; // index into NuclearData::nuclides[]
+  int rxn_idx;     // index into NuclearData::reactions[]
+  RxnType type;    // reaction type for transport dispatch
 };

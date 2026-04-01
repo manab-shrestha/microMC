@@ -1,9 +1,12 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 
 class RNG {
 public:
+  using result_type = uint64_t;
+
   explicit RNG(uint64_t seed = 0x9e3779b97f4a7c15ULL) {
     uint64_t x = seed;
     for (int i = 0; i < 4; ++i)
@@ -12,7 +15,13 @@ public:
       s_[0] = 0x9e3779b97f4a7c15ULL;
   }
 
-  uint64_t operator()() {
+  static constexpr result_type min() { return 0; }
+
+  static constexpr result_type max() {
+    return std::numeric_limits<result_type>::max();
+  }
+
+  result_type operator()() {
     const uint64_t result = rotl(s_[1] * 5ULL, 7) * 9ULL;
     const uint64_t t = s_[1] << 17;
 
@@ -30,9 +39,7 @@ public:
 private:
   uint64_t s_[4]{};
 
-  static uint64_t rotl(uint64_t x, int k) {
-    return (x << k) | (x >> (64 - k));
-  }
+  static uint64_t rotl(uint64_t x, int k) { return (x << k) | (x >> (64 - k)); }
 
   static uint64_t splitmix64(uint64_t &x) {
     uint64_t z = (x += 0x9e3779b97f4a7c15ULL);
@@ -43,5 +50,5 @@ private:
 };
 
 inline double uniform(RNG &rng) {
-  return (rng() >> 11) * (1.0 / 9007199254740992.0); // 1 / 2^53
+  return (rng() >> 11) * (1.0 / 9007199254740992.0);
 }

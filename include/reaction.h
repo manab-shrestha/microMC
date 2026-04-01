@@ -6,14 +6,17 @@
 
 void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
                      const ReactionDescriptor &rxn, const NuclearData &data,
-                     RNG &rng);
+                     double temperature, RNG &rng);
 
 void inelastic_scatter_disc(Neutron &neutron, const NuclideDescriptor &nuc,
                             const ReactionDescriptor &rxn,
-                            const NuclearData &data, RNG &rng);
+                            const NuclearData &data, double temperature,
+                            RNG &rng);
 
-void inelastic_scatter_cont(Neutron &neutron, const ReactionDescriptor &rxn,
-                            const NuclearData &data, RNG &rng);
+void inelastic_scatter_cont(Neutron &neutron, const NuclideDescriptor &nuc,
+                            const ReactionDescriptor &rxn,
+                            const NuclearData &data, double temperature,
+                            RNG &rng);
 
 void fission(Neutron &neutron, const ReactionDescriptor &rxn,
              const NuclearData &data, ParticleBank &fission_bank, double k_eff,
@@ -21,5 +24,6 @@ void fission(Neutron &neutron, const ReactionDescriptor &rxn,
 
 void capture(Neutron &neutron);
 
-void multiply(Neutron &neutron, const ReactionDescriptor &rxn,
-              const NuclearData &data, ParticleBank &secondary_bank, RNG &rng);
+void multiply(Neutron &neutron, const NuclideDescriptor &nuc,
+              const ReactionDescriptor &rxn, const NuclearData &data,
+              double temperature, ParticleBank &secondary_bank, RNG &rng);

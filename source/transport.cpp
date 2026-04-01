@@ -3,14 +3,10 @@
 #include "reaction.h"
 #include "sampling.h"
 #include <algorithm>
-#include <chrono>
 #include <cmath>
-#include <iomanip>
-#include <iostream>
-#include <stdexcept>
 
 namespace {
-constexpr double MAX_SOURCE_ENERGY = 5.0e6; // eV
+constexpr double MAX_SOURCE_ENERGY = 1.0e7; // eV
 constexpr double MIN_UNIFORM = 1e-16;
 } // namespace
 
@@ -69,13 +65,16 @@ void event_process_collision(TransportState &state) {
 
     switch (neutron.rxn.type) {
     case RxnType::ELASTIC:
-      elastic_scatter(neutron, nuc, rxn, *state.data, state.rng);
+      elastic_scatter(neutron, nuc, rxn, *state.data,
+                      state.material->temperature, state.rng);
       break;
     case RxnType::DISCRETE_INELASTIC:
-      inelastic_scatter_disc(neutron, nuc, rxn, *state.data, state.rng);
+      inelastic_scatter_disc(neutron, nuc, rxn, *state.data,
+                             state.material->temperature, state.rng);
       break;
     case RxnType::CONTINUUM_INELASTIC:
-      inelastic_scatter_cont(neutron, rxn, *state.data, state.rng);
+      inelastic_scatter_cont(neutron, nuc, rxn, *state.data,
+                             state.material->temperature, state.rng);
       break;
     case RxnType::FISSION:
       fission(neutron, rxn, *state.data, state.fission_bank, state.k_eff,
@@ -86,7 +85,8 @@ void event_process_collision(TransportState &state) {
       break;
     case RxnType::N2N:
     case RxnType::N3N:
-      multiply(neutron, rxn, *state.data, secondaries, state.rng);
+      multiply(neutron, nuc, rxn, *state.data, state.material->temperature,
+               secondaries, state.rng);
       break;
     }
   }
@@ -150,7 +150,7 @@ void score_flux(TransportState &state) {
   }
 }
 
-static void flush_tally_buffer(TransportState &state) {
+void flush_tally_buffer(TransportState &state) {
   if (!state.tally_file.is_open() || state.tally_buffer.empty())
     return;
   state.tally_file.write(
@@ -165,13 +165,17 @@ void event_compact_bank(ParticleBank &bank) {
   bank.erase(it, bank.end());
 }
 
-// ── Helper: initialise the source bank with uniform energy ─────────
+// ── Helper: initialise the source bank ──────────────────────────────
 
-static void init_source(TransportState &state, int n_particles) {
+void init_source(TransportState &state, int n_particles, bool fixed_source,
+                 const double FIXED_SOURCE_ENERGY) {
   state.current_bank.reserve(n_particles);
   for (int i = 0; i < n_particles; ++i) {
     Neutron particle;
-    particle.E = uniform(state.rng) * MAX_SOURCE_ENERGY;
+    if (fixed_source)
+      particle.E = FIXED_SOURCE_ENERGY;
+    else
+      particle.E = uniform(state.rng) * MAX_SOURCE_ENERGY;
     sample_isodir(particle.Omega_x, particle.Omega_y, particle.Omega_z,
                   state.rng);
     particle.w = 1.0;
@@ -181,7 +185,7 @@ static void init_source(TransportState &state, int n_particles) {
 
 // ── Helper: run one transport cycle until the bank is empty ────────
 
-static void transport_cycle(TransportState &state) {
+void transport_cycle(TransportState &state) {
   while (!state.current_bank.empty()) {
     if (state.fission_bank.capacity() < state.current_bank.size() * 2)
       state.fission_bank.reserve(state.current_bank.size() * 2);
@@ -225,13 +229,16 @@ static void transport_cycle(TransportState &state) {
 
       switch (neutron.rxn.type) {
       case RxnType::ELASTIC:
-        elastic_scatter(neutron, nuc, rxn, *state.data, state.rng);
+        elastic_scatter(neutron, nuc, rxn, *state.data,
+                        state.material->temperature, state.rng);
         break;
       case RxnType::DISCRETE_INELASTIC:
-        inelastic_scatter_disc(neutron, nuc, rxn, *state.data, state.rng);
+        inelastic_scatter_disc(neutron, nuc, rxn, *state.data,
+                               state.material->temperature, state.rng);
         break;
       case RxnType::CONTINUUM_INELASTIC:
-        inelastic_scatter_cont(neutron, rxn, *state.data, state.rng);
+        inelastic_scatter_cont(neutron, nuc, rxn, *state.data,
+                               state.material->temperature, state.rng);
         break;
       case RxnType::FISSION:
         fission(neutron, rxn, *state.data, state.fission_bank, state.k_eff,
@@ -242,7 +249,8 @@ static void transport_cycle(TransportState &state) {
         break;
       case RxnType::N2N:
       case RxnType::N3N:
-        multiply(neutron, rxn, *state.data, next_bank, state.rng);
+        multiply(neutron, nuc, rxn, *state.data, state.material->temperature,
+                 next_bank, state.rng);
         break;
       }
 
@@ -252,120 +260,4 @@ static void transport_cycle(TransportState &state) {
 
     state.current_bank = std::move(next_bank);
   }
-}
-
-// ── Helper: print cycle summary to stdout ──────────────────────────
-
-static void print_cycle_summary(int cycle, int n_inactive, int n_active,
-                                double k_eff, bool active, double k_mean,
-                                double rel_unc) {
-  using std::cout;
-  using std::fixed;
-  using std::setprecision;
-  using std::setw;
-
-  if (active && rel_unc >= 0.0) {
-    double abs_unc = k_mean * rel_unc;
-
-    cout << "Active   " << setw(4) << (cycle - n_inactive + 1) << "/" << setw(4)
-         << n_active << "   k_eff = " << fixed << setprecision(6) << setw(10)
-         << k_mean << "   rel err = " << setprecision(5) << rel_unc << "   ["
-         << setprecision(6) << (k_mean - abs_unc) << ", " << (k_mean + abs_unc)
-         << "]\n";
-  } else {
-    cout << "Inactive " << setw(4) << (cycle + 1) << "/" << setw(4)
-         << n_inactive << "   k_eff = " << fixed << setprecision(6) << setw(10)
-         << k_eff << "\n";
-  }
-}
-// ── Main eigenvalue driver ─────────────────────────────────────────
-
-void run_k_eigenvalue(const Material &mat, const NuclearData &data,
-                      int n_particles, int n_inactive, int n_active,
-                      uint64_t seed, bool flux_detector) {
-  TransportState state;
-  state.material = &mat;
-  state.data = &data;
-  state.rng = RNG(seed);
-  state.k_eff = 1.0;
-  state.cycle = 0;
-  state.k_eff_history.reserve(n_inactive + n_active);
-  if (flux_detector) {
-    state.tally_file.open("tallies/flux_tally.bin", std::ios::binary);
-    if (!state.tally_file)
-      throw std::runtime_error("Failed to open tallies/flux_tally.bin");
-    state.tally_buffer.reserve(static_cast<size_t>(n_particles) * 4);
-  }
-
-  init_source(state, n_particles);
-  auto start = std::chrono::steady_clock::now();
-
-  double k_sum = 0.0, k_sum_sq = 0.0;
-  int n_active_so_far = 0;
-
-  std::cout << std::fixed << std::setprecision(5);
-
-  for (int c = 0; c < n_inactive + n_active; ++c) {
-    state.cycle = c;
-
-    double w_source = 0.0;
-    for (const auto &particle : state.current_bank)
-      w_source += particle.w;
-
-    if (w_source <= 0.0 || !std::isfinite(w_source))
-      throw std::runtime_error(
-          "Source bank extinction: non-positive source weight");
-
-    state.scoring_active = (c >= n_inactive) && flux_detector;
-    if (state.scoring_active)
-      state.tally_buffer.clear();
-
-    transport_cycle(state);
-    if (state.scoring_active)
-      flush_tally_buffer(state);
-
-    double w_fission = 0.0;
-    for (const auto &particle : state.fission_bank)
-      w_fission += particle.w;
-
-    if (w_fission <= 0.0 || !std::isfinite(w_fission))
-      throw std::runtime_error(
-          "Fission bank extinction: non-positive fission weight");
-
-    state.k_eff = state.k_eff * w_fission / w_source;
-    if (!std::isfinite(state.k_eff))
-      throw std::runtime_error("Non-finite k_eff encountered");
-    state.k_eff_history.push_back(state.k_eff);
-
-    std::swap(state.current_bank, state.fission_bank);
-    state.fission_bank.clear();
-    comb_bank(state.current_bank, n_particles, state.rng);
-
-    bool active = (c >= n_inactive);
-    if (active) {
-      ++n_active_so_far;
-      k_sum += state.k_eff;
-      k_sum_sq += state.k_eff * state.k_eff;
-    }
-
-    if (active && n_active_so_far > 1) {
-      double mean = k_sum / n_active_so_far;
-      double variance =
-          (k_sum_sq / n_active_so_far - mean * mean) / n_active_so_far;
-      print_cycle_summary(c, n_inactive, n_active, state.k_eff, true, mean,
-                          std::sqrt(variance) / mean);
-    } else {
-      print_cycle_summary(c, n_inactive, n_active, state.k_eff, active, 0.0,
-                          -1.0);
-    }
-  }
-
-  auto end = std::chrono::steady_clock::now();
-  auto elapsed =
-      std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-  std::cout << "\nk-eigenvalue calculation completed in: "
-            << elapsed.count() / 1000.0 << " seconds.\n";
-
-  state.tally_file.close();
 }

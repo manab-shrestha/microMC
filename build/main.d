@@ -1,7 +1,5 @@
-build/main.o: source/main.cpp include/material.h include/nuclear_data.h \
-  include/transport.h include/neutron.h include/rng.h
+build/main.o: source/main.cpp include/calculation.h include/material.h \
+  include/nuclear_data.h
+include/calculation.h:
 include/material.h:
 include/nuclear_data.h:
-include/transport.h:
-include/neutron.h:
-include/rng.h:

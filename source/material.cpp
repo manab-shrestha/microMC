@@ -8,9 +8,50 @@
 
 namespace {
 constexpr double N_A_BARN_CM = 0.602214076; // Avogadro's number in barn-cm
+
+int infer_n_nuclides(const Material &mat) {
+  int first_zero = MAX_NUCLIDES_PER_MATERIAL;
+  for (int i = 0; i < MAX_NUCLIDES_PER_MATERIAL; ++i) {
+    if (mat.zaids[i] == 0) {
+      first_zero = i;
+      break;
+    }
+  }
+
+  if (first_zero == 0)
+    throw std::runtime_error(std::string("Material '") + mat.name.data() +
+                             "': n_nuclides not set and no ZAIDs provided");
+
+  for (int i = first_zero + 1; i < MAX_NUCLIDES_PER_MATERIAL; ++i) {
+    if (mat.zaids[i] != 0)
+      throw std::runtime_error(
+          std::string("Material '") + mat.name.data() +
+          "': ZAIDs must be contiguous when inferring n_nuclides");
+  }
+
+  return first_zero;
+}
 } // namespace
 
 void resolve_material(Material &mat, const NuclearData &data) {
+  if (mat.temperature <= 0.0)
+    throw std::runtime_error(std::string("Material '") + mat.name.data() +
+                             "': temperature must be positive");
+
+  if (mat.n_nuclides <= 0) {
+    mat.n_nuclides = infer_n_nuclides(mat);
+  }
+
+  if (mat.n_nuclides > MAX_NUCLIDES_PER_MATERIAL)
+    throw std::runtime_error(std::string("Material '") + mat.name.data() +
+                             "': n_nuclides exceeds MAX_NUCLIDES_PER_MATERIAL");
+
+  for (int i = 0; i < mat.n_nuclides; ++i) {
+    if (mat.zaids[i] == 0)
+      throw std::runtime_error(std::string("Material '") + mat.name.data() +
+                               "': ZAID is zero inside active nuclide range");
+  }
+
   for (int i = 0; i < mat.n_nuclides; ++i) {
     int zaid = mat.zaids[i];
     bool found = false;
@@ -40,10 +81,9 @@ void resolve_material(Material &mat, const NuclearData &data) {
                                std::to_string(mat.zaids[i]));
   }
   if (has_pos && has_neg)
-    throw std::runtime_error(
-        std::string("Material '") + mat.name.data() +
-        "': mixed positive/negative fractions — cannot "
-        "mix atomic and mass units");
+    throw std::runtime_error(std::string("Material '") + mat.name.data() +
+                             "': mixed positive/negative fractions — cannot "
+                             "mix atomic and mass units");
 
   bool mass_fracs = has_neg;
 

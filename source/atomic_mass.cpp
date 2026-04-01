@@ -5,9 +5,7 @@
 #include <unordered_map>
 
 namespace mendeleev {
-
 // Auto-generated from ENDF/B-VII.1 HDF5 library via mendeleev
-// ZAID = Z*1000 + A (+300 for metastable)
 static const std::unordered_map<int, double> TABLE = {
     {1001, 1.007825},    {1002, 2.014102},    {1003, 3.016049},
     {2003, 3.016029},    {2004, 4.002603},    {3006, 6.015123},
@@ -155,8 +153,7 @@ static const std::unordered_map<int, double> TABLE = {
 double atomic_mass(int zaid) {
   auto it = TABLE.find(zaid);
   if (it == TABLE.end())
-    throw std::runtime_error("No atomic mass for ZAID " +
-                             std::to_string(zaid));
+    throw std::runtime_error("No atomic mass for ZAID " + std::to_string(zaid));
   return it->second;
 }
 

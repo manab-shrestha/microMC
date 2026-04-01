@@ -1,12 +1,59 @@
 #include "sampling.h"
 #include "material.h"
+#include "nuclear_data.h"
 #include "xs_lookup.h"
 #include <algorithm>
 #include <cmath>
+#include <random>
 #include <vector>
 
 namespace {
 constexpr double KALBACH_ISO_THRESHOLD = 1e-8;
+constexpr double K_B = 1.380649e-23;
+constexpr double AMU_TO_KG = 1.66053906660e-27;
+constexpr double EV_TO_J = 1.602176634e-19;
+constexpr double M_N = 1.67492749804e-27;
+constexpr double SAFETY_FACTOR = 1.2;
+constexpr double VR_SIGMA_MULT = 6.0;
+constexpr int MAX_REJECTION_TRIALS = 2048;
+
+double total_micro_xs_nuclide_at(const NuclearData &data,
+                                 const NuclideDescriptor &nuc, double E) {
+  GridIndex gi = find_grid_index(data, nuc, E);
+  double sigma_t = 0.0;
+  for (int r = 0; r < nuc.n_reactions; ++r) {
+    const auto &rxn = data.reactions[nuc.rxn_offset + r];
+    sigma_t += lookup_micro_xs_at(data, rxn, gi);
+  }
+  return sigma_t;
+}
+
+double sigma_t_max_for_nuclide(const NuclearData &data, int nuclide_idx) {
+  static thread_local const NuclearData *cached_data = nullptr;
+  static thread_local std::vector<double> cached_max;
+
+  if (cached_data != &data) {
+    cached_data = &data;
+    cached_max.assign(data.n_nuclides, -1.0);
+  }
+
+  if (nuclide_idx < 0 || nuclide_idx >= data.n_nuclides)
+    return 0.0;
+
+  double &cached = cached_max[nuclide_idx];
+  if (cached >= 0.0)
+    return cached;
+
+  const NuclideDescriptor &nuc = data.nuclides[nuclide_idx];
+  const double *E_grid = data.energy_grids + nuc.grid_offset;
+  double sigma_max = 0.0;
+  for (int i = 0; i < nuc.grid_length; ++i)
+    sigma_max =
+        std::max(sigma_max, total_micro_xs_nuclide_at(data, nuc, E_grid[i]));
+
+  cached = sigma_max;
+  return cached;
+}
 } // namespace
 
 double sample_tab_cdf(const double *x, const double *cdf, int n, RNG &rng) {
@@ -77,10 +124,10 @@ KalbachResult sample_kalbach_mann(const KalbachMannDistPool &pool, int dist_id,
 
   double E_out = pool.E_out[start + idx] +
                  t * (pool.E_out[start + idx + 1] - pool.E_out[start + idx]);
-  double r = pool.r[start + idx] +
-             t * (pool.r[start + idx + 1] - pool.r[start + idx]);
-  double a = pool.a[start + idx] +
-             t * (pool.a[start + idx + 1] - pool.a[start + idx]);
+  double r =
+      pool.r[start + idx] + t * (pool.r[start + idx + 1] - pool.r[start + idx]);
+  double a =
+      pool.a[start + idx] + t * (pool.a[start + idx + 1] - pool.a[start + idx]);
 
   // Sample mu from Kalbach-Mann separability
   double xi_2 = uniform(rng);
@@ -135,9 +182,9 @@ int sample_nu_bar(const FissionYieldPool &pool, int yield_id, double E,
 
   double frac = (E - pool.energy[offset + bin]) /
                 (pool.energy[offset + bin + 1] - pool.energy[offset + bin]);
-  double nu_bar = pool.nu_bar[offset + bin] +
-                  frac * (pool.nu_bar[offset + bin + 1] -
-                          pool.nu_bar[offset + bin]);
+  double nu_bar =
+      pool.nu_bar[offset + bin] +
+      frac * (pool.nu_bar[offset + bin + 1] - pool.nu_bar[offset + bin]);
 
   int nu = static_cast<int>(nu_bar);
   if (uniform(rng) < (nu_bar - nu))
@@ -209,4 +256,47 @@ ReactionChoice sample_reaction_and_macro_xs(const Material &mat,
     idx = static_cast<int>(reaction_map.size()) - 1;
 
   return {reaction_map[idx], macro_xs_t, true};
+}
+
+Velocity sample_maxwellian_velocity(const double A, const double T, RNG &rng) {
+  const double m = A * AMU_TO_KG;
+  const double sigma = std::sqrt(K_B * T / m);
+
+  std::normal_distribution<double> normal(0.0, sigma);
+
+  return {normal(rng), normal(rng), normal(rng)};
+}
+
+Velocity sample_weighted_target_velocity(const NuclearData &data,
+                                         int nuclide_idx, double vx_n,
+                                         double vy_n, double vz_n,
+                                         double temperature, RNG &rng) {
+  const NuclideDescriptor &nuc = data.nuclides[nuclide_idx];
+  const double A = nuc.A;
+
+  const double m_t = A * AMU_TO_KG;
+  const double sigma_v_t = std::sqrt(K_B * temperature / m_t);
+  const double v_n = std::sqrt(vx_n * vx_n + vy_n * vy_n + vz_n * vz_n);
+
+  const double sigma_t_max = sigma_t_max_for_nuclide(data, nuclide_idx);
+  const double v_r_max = v_n + VR_SIGMA_MULT * sigma_v_t;
+  const double w_max = std::max(SAFETY_FACTOR * sigma_t_max * v_r_max, 1e-30);
+
+  for (int trial = 0; trial < MAX_REJECTION_TRIALS; ++trial) {
+    Velocity V = sample_maxwellian_velocity(A, temperature, rng);
+    const double gx = vx_n - V.x;
+    const double gy = vy_n - V.y;
+    const double gz = vz_n - V.z;
+    const double v_r = std::sqrt(gx * gx + gy * gy + gz * gz);
+
+    const double E_r = 0.5 * M_N * v_r * v_r / EV_TO_J;
+    const double sigma_t_rel = total_micro_xs_nuclide_at(data, nuc, E_r);
+    const double w = sigma_t_rel * v_r;
+
+    const double p_accept = std::min(1.0, w / w_max);
+    if (uniform(rng) < p_accept)
+      return V;
+  }
+
+  return sample_maxwellian_velocity(A, temperature, rng);
 }

@@ -17,7 +17,7 @@ from pathlib import Path
 TEMP = "900K"
 OUTPUT_DIR = Path("bin")
 FILE_MAGIC = 0x4D434442  # "MCDB"
-FILE_VERSION = 1
+FILE_VERSION = 2
 
 # Nuclides to extract, in order. Each entry: (filename, ZAID)
 NUCLIDES = [
@@ -168,6 +168,31 @@ class FissionYieldBuilder:
         return yield_id
 
 
+def _yield_to_xy(yield_array, fallback_energy_grid):
+    """Convert OpenMC yield array into (energy, nu) arrays.
+
+    Accepts either:
+      - shape (2, N): tabulated yield
+      - shape (1,): constant yield
+    """
+    arr = np.asarray(yield_array)
+    if arr.ndim == 1:
+        if arr.size != 1:
+            raise ValueError(f"Unexpected 1D yield shape: {arr.shape}")
+        return np.array([fallback_energy_grid[0], fallback_energy_grid[-1]]), np.array([arr[0], arr[0]])
+
+    if arr.ndim == 2 and arr.shape[0] == 2:
+        return arr[0], arr[1]
+
+    raise ValueError(f"Unsupported yield shape: {arr.shape}")
+
+
+def _as_str(value):
+    if isinstance(value, bytes):
+        return value.decode("ascii")
+    return str(value)
+
+
 # ── Main extraction ──────────────────────────────────────────────────
 
 def extract():
@@ -180,8 +205,11 @@ def extract():
 
     angular_pool = AngularDistPoolBuilder()
     fission_energy_pool = EnergyDistPoolBuilder()
+    delayed_fission_energy_pool = EnergyDistPoolBuilder()
     kalbach_pool = KalbachMannDistPoolBuilder()
     fission_yield_pool = FissionYieldBuilder()
+    delayed_groups = []         # list of (yield_id, dist_id)
+    delayed_fission_descs = []  # list of (group_offset, n_groups)
 
     for name, zaid in NUCLIDES:
         print(f"Processing {name} (ZAID={zaid})...")
@@ -264,14 +292,42 @@ def extract():
                     energy_group = p0["distribution_0"]["energy"]
                     dist_id = fission_energy_pool.add(energy_group)
 
-                    # Nu-bar (prompt yield). As per physics doc, delayed
-                    # neutrons folded into prompt.
-                    yld = np.array(p0["yield"])
-                    if yld.ndim == 1:
-                        # Constant yield — expand to 2-row format
-                        yld = np.array([[E_grid[0], E_grid[-1]],
-                                        [yld[0], yld[0]]])
-                    yield_id = fission_yield_pool.add(yld)
+                    # Prompt nu-bar only (delayed handled separately in C++).
+                    yld_prompt = np.array(p0["yield"])
+                    nu_E, nu_prompt = _yield_to_xy(yld_prompt, E_grid)
+                    yld_prompt_tab = np.vstack((nu_E, nu_prompt))
+                    yield_id = fission_yield_pool.add(yld_prompt_tab)
+
+                    group_offset = len(delayed_groups)
+                    n_groups = 0
+                    for pk in sorted(k for k in r.keys() if k.startswith("product_")):
+                        if pk == "product_0":
+                            continue
+                        p = r[pk]
+                        particle = _as_str(p.attrs.get("particle", ""))
+                        emission = _as_str(p.attrs.get("emission_mode", ""))
+                        if particle != "neutron" or emission != "delayed":
+                            continue
+                        if "yield" not in p:
+                            continue
+                        if "distribution_0" not in p or "energy" not in p["distribution_0"]:
+                            continue
+
+                        yld_delayed = np.array(p["yield"])
+                        dE, dnu = _yield_to_xy(yld_delayed, E_grid)
+                        yld_delayed_tab = np.vstack((dE, dnu))
+                        delayed_yield_id = fission_yield_pool.add(yld_delayed_tab)
+
+                        delayed_energy_group = p["distribution_0"]["energy"]
+                        delayed_dist_id = delayed_fission_energy_pool.add(delayed_energy_group)
+
+                        delayed_groups.append((delayed_yield_id, delayed_dist_id))
+                        n_groups += 1
+
+                    delayed_id = -1
+                    if n_groups > 0:
+                        delayed_id = len(delayed_fission_descs)
+                        delayed_fission_descs.append((group_offset, n_groups))
 
                     reaction_descriptors.append({
                         "type": FISSION,
@@ -282,6 +338,7 @@ def extract():
                         "Q_value": float(r.attrs.get("Q_value", 0.0)),
                         "multiplicity": -1,  # signals energy-dependent nu
                         "yield_id": yield_id,
+                        "delayed_id": delayed_id,
                     })
 
                 elif 51 <= mt <= 90:
@@ -418,10 +475,14 @@ def extract():
           f"{len(angular_pool.mu)} mu points")
     print(f"  Fission energy pool: {fission_energy_pool.n_dists} dists, "
           f"{len(fission_energy_pool.E_out)} E_out points")
+    print(f"  Delayed fission energy pool: {delayed_fission_energy_pool.n_dists} dists, "
+          f"{len(delayed_fission_energy_pool.E_out)} E_out points")
     print(f"  Kalbach pool: {kalbach_pool.n_dists} dists, "
           f"{len(kalbach_pool.E_out)} E_out points")
     print(f"  Fission yields: {len(fission_yield_pool.entries)} entries, "
           f"{len(fission_yield_pool.energies)} points")
+    print(f"  Delayed groups: {len(delayed_groups)} entries")
+    print(f"  Delayed fission descriptors: {len(delayed_fission_descs)} entries")
 
     with open(outpath, "wb") as fp:
         def write_i32(v):
@@ -468,6 +529,15 @@ def extract():
         write_i32(len(fission_yield_pool.entries))
         write_i32(len(fission_yield_pool.energies))
 
+        # Delayed fission energy pool sizes
+        write_i32(delayed_fission_energy_pool.n_dists)
+        write_i32(len(delayed_fission_energy_pool.energies))
+        write_i32(len(delayed_fission_energy_pool.E_out))
+
+        # Delayed fission metadata sizes
+        write_i32(len(delayed_groups))
+        write_i32(len(delayed_fission_descs))
+
         # ── Nuclide descriptors ──────────────────────────────────────
         for nd in nuclide_descriptors:
             write_i32(nd["grid_offset"])
@@ -488,11 +558,21 @@ def extract():
             write_i32(rd["multiplicity"])
             # yield_id (only meaningful for fission, -1 otherwise)
             write_i32(rd.get("yield_id", -1))
+            write_i32(rd.get("delayed_id", -1))
 
         # ── Fission yield descriptors ────────────────────────────────
         for (offset, n) in fission_yield_pool.entries:
             write_i32(offset)
             write_i32(n)
+
+        # ── Delayed fission metadata ─────────────────────────────────
+        for (yield_id, dist_id) in delayed_groups:
+            write_i32(yield_id)
+            write_i32(dist_id)
+
+        for (group_offset, n_groups) in delayed_fission_descs:
+            write_i32(group_offset)
+            write_i32(n_groups)
 
         # ── Double pools ─────────────────────────────────────────────
         write_f64_array(energy_grids)
@@ -509,6 +589,12 @@ def extract():
         write_f64_array(fission_energy_pool.E_out)
         write_f64_array(fission_energy_pool.pdf)
         write_f64_array(fission_energy_pool.cdf)
+
+        # Delayed fission energy pool
+        write_f64_array(delayed_fission_energy_pool.energies)
+        write_f64_array(delayed_fission_energy_pool.E_out)
+        write_f64_array(delayed_fission_energy_pool.pdf)
+        write_f64_array(delayed_fission_energy_pool.cdf)
 
         # Kalbach pool
         write_f64_array(kalbach_pool.energies)
@@ -528,6 +614,9 @@ def extract():
 
         write_i32_array(fission_energy_pool.energy_offsets)
         write_i32_array(fission_energy_pool.table_offsets)
+
+        write_i32_array(delayed_fission_energy_pool.energy_offsets)
+        write_i32_array(delayed_fission_energy_pool.table_offsets)
 
         write_i32_array(kalbach_pool.energy_offsets)
         write_i32_array(kalbach_pool.table_offsets)
