@@ -50,11 +50,5 @@ ReactionChoice sample_reaction_and_macro_xs(const Material &mat,
                                             RNG &rng);
 
 // Sample target velocity from Maxwellian at temperature T (K)
-Velocity sample_maxwellian_velocity(double A, double T, RNG &rng);
-
-// Sample target velocity from collision-rate weighted distribution
-// proportional to f_M(V) * sigma_t(v_r) * v_r.
-Velocity sample_weighted_target_velocity(const NuclearData &data,
-                                         int nuclide_idx, double vx_n,
-                                         double vy_n, double vz_n,
-                                         double temperature, RNG &rng);
+// Each component V_i ~ N(0, k_B*T / m_target)
+Velocity sample_target_velocity(double A, double T, RNG &rng);

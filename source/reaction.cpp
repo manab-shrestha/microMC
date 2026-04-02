@@ -48,10 +48,6 @@ void sample_cm_direction_from_axis(double ax, double ay, double az,
   rotate_dir(dx, dy, dz, mu_cm, rng);
 }
 
-int nuclide_index_from_ref(const NuclearData &data, const NuclideDescriptor &nuc) {
-  return static_cast<int>(&nuc - data.nuclides);
-}
-
 } // namespace
 
 void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
@@ -65,9 +61,7 @@ void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
   const double vy = v_mag * neutron.Omega_y;
   const double vz = v_mag * neutron.Omega_z;
 
-  int nuclide_idx = nuclide_index_from_ref(data, nuc);
-  Velocity V = sample_weighted_target_velocity(data, nuclide_idx, vx, vy, vz,
-                                               temperature, rng);
+  Velocity V = sample_target_velocity(A, temperature, rng);
 
   double gx = vx - V.x;
   double gy = vy - V.y;
@@ -109,9 +103,7 @@ void inelastic_scatter_disc(Neutron &neutron, const NuclideDescriptor &nuc,
   const double vy = v_mag * neutron.Omega_y;
   const double vz = v_mag * neutron.Omega_z;
 
-  int nuclide_idx = nuclide_index_from_ref(data, nuc);
-  Velocity V = sample_weighted_target_velocity(data, nuclide_idx, vx, vy, vz,
-                                               temperature, rng);
+  Velocity V = sample_target_velocity(A, temperature, rng);
 
   const double gx = vx - V.x;
   const double gy = vy - V.y;
@@ -164,9 +156,7 @@ void inelastic_scatter_cont(Neutron &neutron, const NuclideDescriptor &nuc,
   const double vy = v_mag * neutron.Omega_y;
   const double vz = v_mag * neutron.Omega_z;
 
-  int nuclide_idx = nuclide_index_from_ref(data, nuc);
-  Velocity V = sample_weighted_target_velocity(data, nuclide_idx, vx, vy, vz,
-                                               temperature, rng);
+  Velocity V = sample_target_velocity(A, temperature, rng);
 
   const double gx = vx - V.x;
   const double gy = vy - V.y;
@@ -257,9 +247,7 @@ void multiply(Neutron &neutron, const NuclideDescriptor &nuc,
   const double vy = v_mag * neutron.Omega_y;
   const double vz = v_mag * neutron.Omega_z;
 
-  int nuclide_idx = nuclide_index_from_ref(data, nuc);
-  Velocity V = sample_weighted_target_velocity(data, nuclide_idx, vx, vy, vz,
-                                               temperature, rng);
+  Velocity V = sample_target_velocity(A, temperature, rng);
 
   const double gx = vx - V.x;
   const double gy = vy - V.y;

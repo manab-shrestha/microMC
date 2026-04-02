@@ -103,5 +103,5 @@ ax2.set_ylabel(r"$\phi$")
 ax1.set_xlim(edges_eV[0], edges_eV[-1])
 
 plt.tight_layout()
-plt.savefig("flux_spectra.png", dpi=400)
+plt.savefig("flux_spectra_fs.png", dpi=400)
 plt.show()

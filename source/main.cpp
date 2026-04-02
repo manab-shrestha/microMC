@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    calculate_k_eigenvalue(mat1, data, 5000, 50, 500, 321, flux_detector);
-    // calculate_fixed_source(mat5, data, 10000, 1.0e5, 2, 123, flux_detector);
+    // calculate_k_eigenvalue(mat1, data, 10000, 100, 1000, 67, flux_detector);
+    calculate_fixed_source(mat5, data, 1000, 1.0e5, 1000, 123, flux_detector);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;

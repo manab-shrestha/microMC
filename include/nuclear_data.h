@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-// ── Reaction type enum (matches Python extractor) ──────────────────
+// enuration must matches Python extractor
 enum class RxnType : int {
   ELASTIC = 0,
   DISCRETE_INELASTIC = 1,
@@ -14,7 +14,7 @@ enum class RxnType : int {
   N3N = 6,
 };
 
-// ── POD descriptors (device-compatible, no std:: types) ────────────
+// POD descriptors
 struct NuclideDescriptor {
   int grid_offset;
   int grid_length;
@@ -52,7 +52,7 @@ struct DelayedFissionDescriptor {
   int n_groups;
 };
 
-// ── Distribution pools (POD, flat arrays) ──────────────────────────
+// Distribution pools
 
 struct AngularDistPool {
   const int *energy_offsets; // [n_dists + 1]
@@ -100,7 +100,7 @@ struct FissionYieldPool {
   int total_points;
 };
 
-// ── Top-level nuclear data (all pools) ─────────────────────────────
+// Top levl nuclear data (all pools)
 
 struct NuclearData {
   const NuclideDescriptor *nuclides;
@@ -125,7 +125,7 @@ struct NuclearData {
   int n_delayed_fission_descs;
 };
 
-// ── Host-side owning container ─────────────────────────────────────
+// Host side owning container
 
 struct NuclearDataHost {
   std::vector<NuclideDescriptor> nuclides;
@@ -183,10 +183,10 @@ struct NuclearDataHost {
 // Load from binary file produced by extract_hdf5.py
 NuclearDataHost load_nuclear_data(const std::string &path);
 
-// Human-readable name for a RxnType value
+// Human readable name for a RxnType value
 const char *rxn_type_name(RxnType type);
 
-// ── Result of reaction sampling ────────────────────────────────────
+// Result of reaction sampling
 
 struct ReactionSample {
   int nuclide_idx; // index into NuclearData::nuclides[]

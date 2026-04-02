@@ -218,7 +218,7 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
     }
   }
 
-  // ── Fission yield descriptors ───────────────────────────────────
+  // Fission yield descriptors
   h.fission_yield_descs.resize(fy_n_yields);
   for (int i = 0; i < fy_n_yields; ++i) {
     read_i32(f, h.fission_yield_descs[i].offset);
@@ -239,7 +239,7 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
     }
   }
 
-  // ── Double pools ────────────────────────────────────────────────
+  // Double pools
   read_f64_vec(f, h.energy_grids, n_energy_points);
   read_f64_vec(f, h.xs_pool, n_xs_points);
 
@@ -263,7 +263,7 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
     read_f64_vec(f, h.dfe_cdf, dfe_n_out);
   }
 
-  // Kalbach
+  // Kalbach-Mann
   read_f64_vec(f, h.km_energies, km_n_energies);
   read_f64_vec(f, h.km_E_out, km_n_out);
   read_f64_vec(f, h.km_pdf, km_n_out);
@@ -275,7 +275,7 @@ NuclearDataHost load_nuclear_data(const std::string &path) {
   read_f64_vec(f, h.fy_energy, fy_n_points);
   read_f64_vec(f, h.fy_nu_bar, fy_n_points);
 
-  // ── Int pools ───────────────────────────────────────────────────
+  // Int pools
   read_i32_vec(f, h.ang_energy_offsets, ang_n_dists + 1);
   read_i32_vec(f, h.ang_table_offsets, ang_n_energies + 1);
 

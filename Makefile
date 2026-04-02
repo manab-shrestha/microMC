@@ -1,5 +1,5 @@
 CXX      := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -O3 -DNDEBUG -march=native -ffast-math -flto -I include
+CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -DNDEBUG -march=native -ffast-math -I include
 
 TARGET  := micromc
 SRC_DIR := source
