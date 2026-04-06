@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     printf("ZAID %d  N = %.10e\n", mat1.zaids[i], mat1.number_densities[i]);
 
   try {
-    calculate_k_eigenvalue(mat1, data, 10000, 10, 100, 67, flux_detector);
+    calculate_k_eigenvalue(mat1, data, 10000, 100, 1000, 1, flux_detector);
     // calculate_fixed_source(mat5, data, 1000, 1.0e5, 1000, 123,
     // flux_detector);
   } catch (const std::exception &e) {

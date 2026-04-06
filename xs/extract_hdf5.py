@@ -229,8 +229,10 @@ def extract():
             rxn_keys = sorted(nuc["reactions"].keys(),
                               key=lambda x: int(x.split("_")[1]))
 
-            # Collect non-fission absorption XS (MT=102..117)
-            # We sum them into a single absorption channel
+            # Collect non-fission absorption XS.
+            # Includes MT=102..117 plus sub-channels MT=600..849
+            # ((n,p_i), (n,d_i), (n,t_i), (n,3He_i), (n,alpha_i)).
+            # We sum them into a single absorption channel.
             absorption_xs = np.zeros(grid_length)
             has_absorption = False
 
@@ -242,11 +244,7 @@ def extract():
                 if redundant:
                     continue
 
-                # Skip MTs we don't care about for neutron transport
-                if mt >= 200:
-                    continue
-
-                if 102 <= mt <= 117:
+                if (102 <= mt <= 117) or (600 <= mt <= 849):
                     # Absorption channel — accumulate
                     xs_data = r[TEMP]["xs"]
                     xs = np.array(xs_data)
