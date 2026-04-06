@@ -10,7 +10,20 @@
 namespace {
 constexpr double KALBACH_ISO_THRESHOLD = 1e-8;
 constexpr double K_B = 1.380649e-23;
+constexpr double K_B_EV = 8.617333262e-5;
 constexpr double AMU_TO_KG = 1.66053906660e-27;
+constexpr double M_N = 1.67492749804e-27;
+constexpr double PI = 3.14159265358979323846;
+
+double sample_x2exp_minus_x2(RNG &rng) {
+  std::gamma_distribution<double> gamma_3_over_2(1.5, 1.0);
+  return std::sqrt(gamma_3_over_2(rng));
+}
+
+double sample_x3exp_minus_x2(RNG &rng) {
+  std::gamma_distribution<double> gamma_2(2.0, 1.0);
+  return std::sqrt(gamma_2(rng));
+}
 } // namespace
 
 double sample_tab_cdf(const double *x, const double *cdf, int n, RNG &rng) {
@@ -53,6 +66,9 @@ int stoch_energy_interp(const int *energy_offsets, const double *energies,
 
 double sample_cosine(const AngularDistPool &pool, int dist_id, double E,
                      RNG &rng) {
+  if (dist_id < 0 || dist_id >= pool.n_dists)
+    return 2.0 * uniform(rng) - 1.0;
+
   int j =
       stoch_energy_interp(pool.energy_offsets, pool.energies, dist_id, E, rng);
 
@@ -222,4 +238,59 @@ Velocity sample_target_velocity(double A, double T, RNG &rng) {
   std::normal_distribution<double> normal(0.0, sigma);
 
   return {normal(rng), normal(rng), normal(rng)};
+}
+
+bool use_moving_target_elastic(double E_eV, double A, double T_K) {
+  const double kT_eV = K_B_EV * T_K;
+  return !(E_eV > 400.0 * kT_eV && A > 1.0);
+}
+
+Velocity sample_collision_conditioned_target_velocity(double E_eV,
+                                                      double Omega_x,
+                                                      double Omega_y,
+                                                      double Omega_z, double A,
+                                                      double T_K, RNG &rng) {
+  if (A <= 0.0 || T_K <= 0.0)
+    return {0.0, 0.0, 0.0};
+
+  const double kT_eV = K_B_EV * T_K;
+  const double Y = std::sqrt(std::max(0.0, A * E_eV / kT_eV));
+  const double alpha = 2.0 / (Y * std::sqrt(PI) + 2.0);
+  const double vt_scale = std::sqrt(2.0 * K_B * T_K / (A * M_N));
+
+  double nx = Omega_x;
+  double ny = Omega_y;
+  double nz = Omega_z;
+  const double n_norm2 = nx * nx + ny * ny + nz * nz;
+  if (n_norm2 <= 0.0) {
+    nx = 0.0;
+    ny = 0.0;
+    nz = 1.0;
+  } else {
+    const double inv_norm = 1.0 / std::sqrt(n_norm2);
+    nx *= inv_norm;
+    ny *= inv_norm;
+    nz *= inv_norm;
+  }
+
+  while (true) {
+    const double X = (uniform(rng) < alpha) ? sample_x3exp_minus_x2(rng)
+                                            : sample_x2exp_minus_x2(rng);
+
+    const double mu = 2.0 * uniform(rng) - 1.0;
+    const double rel2 = std::max(0.0, Y * Y + X * X - 2.0 * X * Y * mu);
+    const double rel = std::sqrt(rel2);
+    const double denom = Y + X;
+    const double p_acc = (denom > 0.0) ? (rel / denom) : 1.0;
+    if (uniform(rng) >= p_acc)
+      continue;
+
+    double tx = nx;
+    double ty = ny;
+    double tz = nz;
+    rotate_dir(tx, ty, tz, mu, rng);
+
+    const double vt = X * vt_scale;
+    return {vt * tx, vt * ty, vt * tz};
+  }
 }

@@ -61,7 +61,12 @@ void elastic_scatter(Neutron &neutron, const NuclideDescriptor &nuc,
   const double vy = v_mag * neutron.Omega_y;
   const double vz = v_mag * neutron.Omega_z;
 
-  Velocity V = sample_target_velocity(A, temperature, rng);
+  Velocity V{0.0, 0.0, 0.0};
+  if (use_moving_target_elastic(neutron.E, A, temperature)) {
+    V = sample_collision_conditioned_target_velocity(
+        neutron.E, neutron.Omega_x, neutron.Omega_y, neutron.Omega_z, A,
+        temperature, rng);
+  }
 
   double gx = vx - V.x;
   double gy = vy - V.y;

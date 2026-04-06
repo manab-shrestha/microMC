@@ -52,3 +52,15 @@ ReactionChoice sample_reaction_and_macro_xs(const Material &mat,
 // Sample target velocity from Maxwellian at temperature T (K)
 // Each component V_i ~ N(0, k_B*T / m_target)
 Velocity sample_target_velocity(double A, double T, RNG &rng);
+
+// SCONE-style switching rule for elastic moving-target treatment
+bool use_moving_target_elastic(double E_eV, double A, double T_K);
+
+// Sample target velocity from collision-conditioned constant-XS free-gas law
+// for a neutron at energy E_eV and lab direction (Omega_x, Omega_y, Omega_z).
+Velocity sample_collision_conditioned_target_velocity(double E_eV,
+                                                     double Omega_x,
+                                                     double Omega_y,
+                                                     double Omega_z,
+                                                     double A, double T_K,
+                                                     RNG &rng);

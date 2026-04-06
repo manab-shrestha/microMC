@@ -15,7 +15,9 @@ import h5py as h5
 from pathlib import Path
 
 TEMP = "900K"
-OUTPUT_DIR = Path("bin")
+BASE_DIR = Path(__file__).resolve().parent
+HDF5_DIR = BASE_DIR / "hdf5"
+OUTPUT_DIR = BASE_DIR / "bin"
 FILE_MAGIC = 0x4D434442  # "MCDB"
 FILE_VERSION = 2
 
@@ -213,7 +215,7 @@ def extract():
 
     for name, zaid in NUCLIDES:
         print(f"Processing {name} (ZAID={zaid})...")
-        with h5.File(f"hdf5/{name}.h5", "r") as f:
+        with h5.File(HDF5_DIR / f"{name}.h5", "r") as f:
             nuc = f[name]
             awr = nuc.attrs["atomic_weight_ratio"]
             E_grid = np.array(nuc["energy"][TEMP])
@@ -264,9 +266,12 @@ def extract():
                     xs_off = len(xs_pool)
                     xs_pool.extend(xs.tolist())
 
-                    # Angular distribution
-                    angle = r["product_0"]["distribution_0"]["angle"]
-                    dist_id = angular_pool.add(angle)
+                    # Angular distribution (fallback to isotropic if absent)
+                    d0 = r["product_0"]["distribution_0"]
+                    if "angle" in d0:
+                        dist_id = angular_pool.add(d0["angle"])
+                    else:
+                        dist_id = -1
 
                     reaction_descriptors.append({
                         "type": ELASTIC,
@@ -350,11 +355,13 @@ def extract():
                     xs_off = len(xs_pool)
                     xs_pool.extend(xs.tolist())
 
-                    # Angular distribution
+                    # Angular distribution (fallback to isotropic if absent)
                     p0 = r["product_0"]
                     d0 = p0["distribution_0"]
-                    angle = d0["angle"]
-                    dist_id = angular_pool.add(angle)
+                    if "angle" in d0:
+                        dist_id = angular_pool.add(d0["angle"])
+                    else:
+                        dist_id = -1
 
                     reaction_descriptors.append({
                         "type": DISCRETE_INELASTIC,
