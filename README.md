@@ -4,7 +4,7 @@ A toy Monte Carlo neutron transport code for k-eigenvalue and fixed-source calcu
 
 ## Dependencies
 
-### C++ (system)
+### C++
 
 - **C++17** compiler (g++ or clang++)
 - **HDF5** with C++ bindings
