@@ -41,7 +41,7 @@ Nuclear data files are not included in the repository. The code expects ENDF/B-V
 After downloading, extract the archive:
 
 ```bash
-tar -xJf 9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz
+tar -xJf endfb71.tar.xz
 ```
 
 Then set `xs_path` in `source/main.cpp` to the extracted `neutron` directory:
