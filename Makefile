@@ -1,5 +1,9 @@
 CXX      := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -DNDEBUG -march=native -ffast-math -I include
+
+HDF5_CFLAGS := $(shell pkg-config --cflags hdf5 2>/dev/null || echo "-I/opt/homebrew/include")
+HDF5_LIBS   := $(shell pkg-config --libs hdf5 2>/dev/null || echo "-L/opt/homebrew/lib -lhdf5") -lhdf5_cpp
+
+CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -DNDEBUG -march=native -ffast-math -I include $(HDF5_CFLAGS)
 
 TARGET  := micromc
 SRC_DIR := source
@@ -14,7 +18,7 @@ DEPS := $(OBJS:.o=.d)
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(HDF5_LIBS)
 
 $(BLD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BLD_DIR)
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@

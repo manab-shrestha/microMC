@@ -3,6 +3,7 @@
 #include "nuclear_data.h"
 #include "xs_lookup.h"
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -55,17 +56,25 @@ void resolve_material(Material &mat, const NuclearData &data) {
   for (int i = 0; i < mat.n_nuclides; ++i) {
     int zaid = mat.zaids[i];
     bool found = false;
+    int best_j = -1;
+    double best_diff = 1e30;
     for (int j = 0; j < data.n_nuclides; ++j) {
-      if (data.nuclides[j].zaid == zaid) {
-        mat.nuclide_ids[i] = j;
+      if (data.nuclides[j].zaid != zaid)
+        continue;
+      double diff = (data.nuclides[j].temperature > 0.0)
+                        ? std::abs(data.nuclides[j].temperature - mat.temperature)
+                        : 0.0;
+      if (diff < best_diff) {
+        best_diff = diff;
+        best_j = j;
         found = true;
-        break;
       }
     }
     if (!found)
       throw std::runtime_error(std::string("Material '") + mat.name.data() +
                                "': ZAID " + std::to_string(zaid) +
                                " not found in nuclear data");
+    mat.nuclide_ids[i] = best_j;
   }
 
   // Serpent-style density/fraction conversion (mixing atomic & mass forbidden)

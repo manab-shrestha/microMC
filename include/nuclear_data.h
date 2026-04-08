@@ -22,6 +22,7 @@ struct NuclideDescriptor {
   int rxn_offset;
   int n_reactions;
   int zaid;
+  double temperature; // temperature (K) at which this data was loaded
 };
 
 struct ReactionDescriptor {
@@ -182,6 +183,13 @@ struct NuclearDataHost {
 
 // Load from binary file produced by extract_hdf5.py
 NuclearDataHost load_nuclear_data(const std::string &path);
+
+// Load directly from OpenMC HDF5 files, driven by material definitions.
+// Only loads nuclides referenced by the given materials, at their temperatures.
+struct Material;
+NuclearDataHost load_nuclear_data_hdf5(const std::string &hdf5_dir,
+                                       Material *const *materials,
+                                       int n_materials);
 
 // Human readable name for a RxnType value
 const char *rxn_type_name(RxnType type);

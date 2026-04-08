@@ -8,9 +8,22 @@
 int main(int argc, char *argv[]) {
   bool flux_detector = (argc > 1 && std::string(argv[1]) == "true");
 
+  // Define materials first — the HDF5 loader reads only the nuclides needed
+  Material mat1 = {"mat1",
+                   -10.49,
+                   900.0,
+                   {1001, 8016, 92235, 92238},
+                   {0.4940, 0.3461, 0.005678, 0.1541}};
+
+  //Material mat5 = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
+
+  Material *all_mats[] = {&mat1};
+
+  const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
+
   NuclearDataHost host;
   try {
-    host = load_nuclear_data("xs/bin/nuclear_data.bin");
+    host = load_nuclear_data_hdf5(xs_path, all_mats, 1);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;
@@ -18,43 +31,16 @@ int main(int argc, char *argv[]) {
 
   NuclearData data = host.view();
 
-  // Material identical to that in NE8 CW1 and CW2
-  Material mat1 = {"mat1",
-                   -10.49,
-                   900.0,
-                   {1001, 8016, 92235, 92238},
-                   {0.4940, 0.3461, 0.005678, 0.1541}};
-  Material mat2 = {"mat2", -10.0, 900.0, {92235, 92238}, {0.5, 0.5}};
-  Material mat3 = {"mat3",
-                   -10.49,
-                   900.0,
-                   {1001, 8016, 92235, 92238},
-                   {0.4940 * 2, 0.3461 * 2, 0.005678, 0.1541}};
-  Material mat4 = {"mat4",
-                   -10.49,
-                   900.0,
-                   {1001, 8016, 92235, 92238},
-                   {0.04940, 0.03461, 0.005678, 0.1541}};
-  Material mat5 = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
   try {
-    resolve_material(mat1, data);
-    resolve_material(mat2, data);
-    resolve_material(mat3, data);
-    resolve_material(mat4, data);
-    resolve_material(mat5, data);
-
+    for (Material *mat : all_mats)
+      resolve_material(*mat, data);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;
   }
 
-  for (int i = 0; i < mat1.n_nuclides; ++i)
-    printf("ZAID %d  N = %.10e\n", mat1.zaids[i], mat1.number_densities[i]);
-
   try {
-    calculate_k_eigenvalue(mat1, data, 10000, 100, 1000, 1, flux_detector);
-    // calculate_fixed_source(mat5, data, 1000, 1.0e5, 1000, 123,
-    // flux_detector);
+    calculate_k_eigenvalue(mat1, data, 1000, 10, 50, 1, flux_detector);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;

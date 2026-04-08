@@ -8,7 +8,6 @@
 #include <stdexcept>
 
 // ── Helper: pirint cycle summary to stdout ──────────────────────────
-
 static void print_cycle_summary(int cycle, int n_inactive, int n_active,
                                 double k_eff, bool active, double k_mean,
                                 double rel_unc) {
@@ -24,15 +23,13 @@ static void print_cycle_summary(int cycle, int n_inactive, int n_active,
 
     cout << left << setw(15) << "Active cycle" << right << setw(4)
          << (cycle - n_inactive + 1) << " / " << setw(4) << n_active
-         << "   k-eff = " << fixed << setprecision(6) << setw(10) << k_mean
-         << "   +/- " << fixed << setprecision(5) << setw(9) << rel_unc
-         << "   [" << setprecision(6) << setw(10) << (k_mean - abs_unc) << " "
-         << setprecision(6) << setw(10) << (k_mean + abs_unc) << "]\n";
+         << "   k-eff = " << fixed << setprecision(6) << k_mean << " +/- "
+         << setprecision(5) << rel_unc << "   [" << setprecision(6)
+         << (k_mean - abs_unc) << " " << (k_mean + abs_unc) << "]\n";
   } else {
     cout << left << setw(15) << "Inactive cycle" << right << setw(4)
          << (cycle + 1) << " / " << setw(4) << n_inactive
-         << "   k-eff = " << fixed << setprecision(6) << setw(10) << k_eff
-         << "\n";
+         << "   k-eff = " << fixed << setprecision(6) << k_eff << "\n";
   }
 }
 
