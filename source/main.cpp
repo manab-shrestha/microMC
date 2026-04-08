@@ -8,7 +8,6 @@
 int main(int argc, char *argv[]) {
   bool flux_detector = (argc > 1 && std::string(argv[1]) == "true");
 
-  // Define materials first — the HDF5 loader reads only the nuclides needed
   Material mat1 = {"mat1",
                    -10.49,
                    900.0,
@@ -20,6 +19,8 @@ int main(int argc, char *argv[]) {
   Material *all_mats[] = {&mat1};
 
   const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
+  //const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron"
+
 
   NuclearDataHost host;
   try {
