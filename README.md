@@ -4,7 +4,7 @@ A toy Monte Carlo neutron transport code for k-eigenvalue and fixed-source calcu
 
 ## Dependencies
 
-### C++ (system)
+### C++
 
 - **C++17** compiler (g++ or clang++)
 - **HDF5** with C++ bindings
@@ -35,14 +35,13 @@ pip install -r requirements.txt
 ```
 
 ## Nuclear data
-## Nuclear data
 
-Nuclear data files are not included in the repository. The code expects ENDF/B-VII.1 HDF5 files in OpenMC format, which can be downloaded [here](https://anl.box.com/shared/static/9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz).
+Nuclear data files are not included in the repository. The code expects ENDF/B-VII.1 HDF5 files, which can be downloaded [here](https://anl.box.com/shared/static/9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz).
 
 After downloading, extract the archive:
 
 ```bash
-tar -xJf 9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz
+tar -xJf endfb71.tar.xz
 ```
 
 Then set `xs_path` in `source/main.cpp` to the extracted `neutron` directory:
@@ -73,7 +72,7 @@ Use the plotting scripts to visualise the results:
 
 ```bash
 # example
-```bash
 source venv/bin/activate
 python tallies/plot_flux.py
 ```
+
