@@ -72,8 +72,8 @@ Tally output is written to `tallies/`. Currently, only a flux spectrum tally is 
 Use the plotting scripts to visualise the results:
 
 ```bash
-# example
 ```bash
+# example
 source venv/bin/activate
 python tallies/plot_flux.py
 ```
