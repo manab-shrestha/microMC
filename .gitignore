@@ -37,3 +37,7 @@ perf/
 *.out
 *.toc
 *.pdf
+
+# descriptive files
+*.md
+!README.md
