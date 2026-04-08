@@ -36,7 +36,7 @@ pip install -r requirements.txt
 
 ## Nuclear data
 
-Nuclear data files are not included in the repository. The code expects ENDF/B-VII.1 HDF5 files in OpenMC format, which can be downloaded [here](https://anl.box.com/shared/static/9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz).
+Nuclear data files are not included in the repository. The code expects ENDF/B-VII.1 HDF5 files, which can be downloaded [here](https://anl.box.com/shared/static/9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz).
 
 After downloading, extract the archive:
 
