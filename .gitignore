@@ -1,9 +1,39 @@
-*.md
-!CLAUDE.md
-!BOTTLENECKS.md
-tallies/*.bin
+# Build artifacts
+build/
+micromc
+*.o
+*.d
+
+# Compile database (regenerate with `make compdb`)
+compile_commands.json
+
+# Editor / IDE
+.cache/
+.clangd
 .DS_Store
-build/*
-!build/.gitkeep
+*.swp
+*.swo
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Tallies (binary output)
+tallies/*.bin
+
+# Images (regenerated from tally data)
 *.png
 *.jpeg
+
+# Perf data
+perf.data
+perf.data.old
+perf/
+
+# LaTeX artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
