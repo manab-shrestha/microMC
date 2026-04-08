@@ -1,6 +1,6 @@
 # microMC
 
-A Monte Carlo neutron transport code for k-eigenvalue and fixed-source calculations. Designed with a flat, SoA-friendly data layout for eventual CUDA porting.
+A toy Monte Carlo neutron transport code for k-eigenvalue and fixed-source calculations. Designed for eventual CUDA porting.
 
 ## Dependencies
 
@@ -17,7 +17,7 @@ brew install hdf5
 sudo apt install libhdf5-dev
 ```
 
-- **bear** (optional, for generating `compile_commands.json` for LSP support)
+- **bear** (optional but recommended for (n)vim users. bear generates `compile_commands.json` for LSP support)
 
 ```bash
 brew install bear      # macOS
@@ -35,8 +35,17 @@ pip install -r requirements.txt
 ```
 
 ## Nuclear data
+## Nuclear data
 
-Nuclear data files are not included in the repository. The code expects ENDF/B-VII.1 HDF5 files in OpenMC format. Set the path in `source/main.cpp`:
+Nuclear data files are not included in the repository. The code expects ENDF/B-VII.1 HDF5 files in OpenMC format, which can be downloaded [here](https://anl.box.com/shared/static/9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz).
+
+After downloading, extract the archive:
+
+```bash
+tar -xJf 9igk353zpy8fn9ttvtrqgzvw1vtejoz6.xz
+```
+
+Then set `xs_path` in `source/main.cpp` to the extracted `neutron` directory:
 
 ```cpp
 const std::string xs_path = "/path/to/endfb-vii.1-hdf5/neutron";
@@ -57,13 +66,14 @@ make compdb   # regenerate compile_commands.json (requires bear)
 ./micromc true     # with flux tally output
 ```
 
-Tally output is written to `tallies/`. Use the plotting scripts to visualise:
 
+Tally output is written to `tallies/`. Currently, only a flux spectrum tally is available; additional tallies will be implemented in future.
+
+Use the plotting scripts to visualise the results:
+
+```bash
+# example
 ```bash
 source venv/bin/activate
 python tallies/plot_flux.py
 ```
-
-## Architecture
-
-See `CLAUDE.md` for a detailed description of the code architecture, data structures, and design decisions.
