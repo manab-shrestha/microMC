@@ -18,14 +18,18 @@ static void print_cycle_summary(int cycle, int n_inactive, int n_active,
   using std::setprecision;
   using std::setw;
 
-  if (active && rel_unc >= 0.0) {
-    double abs_unc = k_mean * rel_unc;
-
+  if (active) {
     cout << left << setw(15) << "Active cycle" << right << setw(4)
          << (cycle - n_inactive + 1) << " / " << setw(4) << n_active
-         << "   k-eff = " << fixed << setprecision(6) << k_mean << " +/- "
-         << setprecision(5) << rel_unc << "   [" << setprecision(6)
-         << (k_mean - abs_unc) << " " << (k_mean + abs_unc) << "]\n";
+         << "   k-eff = " << fixed << setprecision(6) << k_mean;
+
+    if (rel_unc >= 0.0) {
+      double abs_unc = k_mean * rel_unc;
+      cout << " +/- " << setprecision(6) << rel_unc << "   [" << setprecision(6)
+           << (k_mean - abs_unc) << " " << (k_mean + abs_unc) << "]";
+    }
+
+    cout << "\n";
   } else {
     cout << left << setw(15) << "Inactive cycle" << right << setw(4)
          << (cycle + 1) << " / " << setw(4) << n_inactive
@@ -101,14 +105,19 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
       k_sum_sq += state.k_eff * state.k_eff;
     }
 
-    if (active && n_active_so_far > 1) {
+    if (active) {
       double mean = k_sum / n_active_so_far;
-      double variance =
-          (k_sum_sq / n_active_so_far - mean * mean) / n_active_so_far;
+      double rel_unc = -1.0;
+      if (n_active_so_far > 1) {
+        double variance =
+            (k_sum_sq / n_active_so_far - mean * mean) / n_active_so_far;
+        variance = std::max(variance, 0.0);
+        rel_unc = std::sqrt(variance) / mean;
+      }
       print_cycle_summary(c, n_inactive, n_active, state.k_eff, true, mean,
-                          std::sqrt(variance) / mean);
+                          rel_unc);
     } else {
-      print_cycle_summary(c, n_inactive, n_active, state.k_eff, active, 0.0,
+      print_cycle_summary(c, n_inactive, n_active, state.k_eff, false, 0.0,
                           -1.0);
     }
   }
