@@ -19,11 +19,7 @@ set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
 
 % --- Fixed source calculation --- %
 set nps 1000000 1000
-
-src s1 n
-  sp 0.0 0.0 0.0
-  dir 1
-  erg 0.1
+src s1 n sp 0.0 0.0 0.0 se 0.5
 
 % --- Normalisation --- %
 set flux 1
