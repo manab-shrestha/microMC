@@ -6,17 +6,17 @@
 #include <string>
 
 int main(int argc, char *argv[]) {
-  bool flux_detector = (argc > 1 && std::string(argv[1]) == "true");
+  bool tally_on = (argc > 1 && std::string(argv[1]) == "true");
 
-  Material mat1 = {"mat1",
+  Material fuel = {"fuel",
                    -10.49,
                    900.0,
                    {1001, 8016, 92235, 92238},
                    {0.4940, 0.3461, 0.005678, 0.1541}};
 
-  //Material mat5 = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
+  Material water = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
 
-  Material *all_mats[] = {&mat1};
+  Material *all_mats[] = {&fuel,&water};
 
   const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
   //const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron"
@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 
   NuclearDataHost host;
   try {
-    host = load_nuclear_data_hdf5(xs_path, all_mats, 1);
+    host = load_nuclear_data_hdf5(xs_path, all_mats, 2);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;
@@ -41,7 +41,8 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    calculate_k_eigenvalue(mat1, data, 1000, 10, 50, 1, flux_detector);
+    calculate_k_eigenvalue(fuel, data, 50000, 100, 1000, 1, tally_on);
+    calculate_fixed_source(water,data,5000,5.0e5,1000,1,tally_on);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;
