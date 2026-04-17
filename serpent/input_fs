@@ -17,11 +17,11 @@ set bc 2
 % --- Cross section library --- %
 set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
 
-% --- disable group constants --- %
+% --- Disable group constants --- %
 set gcu -1
 
 % --- Fixed source calculation --- %
-set nps 5000000 1
+set nps 5000000 100
 src s1 n sp 0.0 0.0 0.0 se 0.5
 
 % --- Normalisation --- %
@@ -30,6 +30,6 @@ set flux 1
 % --- Detectors --- %
 % --- Energy groups --- %
 ene WMS172 4 wms172
-ene FINE   3 1000 1E-11 20.0
+ene FINE   3 5000 1E-11 20.0
 
 det flux_serpent dm water de FINE

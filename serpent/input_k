@@ -1,4 +1,4 @@
-set title "micromc validation k-eigenvalue"
+set title "MICROMC VALIDATION K-EIGENVALUE"
 
 % --- define materials --- %
 mat fuel -10.49 tmp 900
@@ -6,6 +6,13 @@ mat fuel -10.49 tmp 900
   8016.09c   0.3461
   92235.09c  0.005678
   92238.09c  0.1541
+
+mat absorber -10.49 tmp 900
+  1001.09c   0.4940
+  8016.09c   0.3461
+  92235.09c  0.005678
+  92238.09c  0.1541
+  5010.09c   0.000325
 
 % --- define geometry --- %
 surf s1 sqc 0.0 0.0 100.0
@@ -23,18 +30,27 @@ set ures 0
 % set xsplot 11 0 10
 
 % --- cross section library --- %
-% set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
-set acelib "Users/shrestha/endfb71/s2v0_endfb71.xsdata"
+set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
 
 % --- neutron population and criticality cycles --- %
-set pop 10000 1000 100
+set pop 10000 200 10
 
 % --- normalisation --- %
-set flux 1
+% set flux 1
 
 % --- detectors --- %
-% --- energy groups --- %
+% fictitous materials for scoring
+mat U235 1.0 92235.09c 1.0
+mat U238 1.0 92238.09c 1.0
+mat O6   1.0  1001.09c 1.0
+mat H1   1.0  8016.09c 1.0
+
+% energy groups
 ene wms172 4 wms172
-ene fine   3 1000 1e-11 20.0
+ene fine   3 5000 1e-11 20.0
 
 det flux_serpent dm fuel de fine
+det dfiss_u235 dm fuel dr 18 U235 de fine
+det dabs_u238 dm fuel dr 101 U238 de fine
+det delastic_o dm fuel dr 2 O6 de fine
+det dinelastic dm fuel dr 4 H1 de fine
