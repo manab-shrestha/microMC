@@ -4,7 +4,7 @@
 #include "neutron.h"
 #include "nuclear_data.h"
 #include "rng.h"
-#include <fstream>
+#include "tally.h"
 #include <vector>
 
 struct TransportState {
@@ -16,9 +16,7 @@ struct TransportState {
   double k_eff;
   int cycle;
   std::vector<double> k_eff_history;
-  std::ofstream tally_file;
-  std::vector<double> tally_buffer;
-  bool scoring_active{false};
+  TallyManager tallies;
 };
 
 void event_calc_xs(TransportState &state);
@@ -26,9 +24,7 @@ void event_advance(TransportState &state);
 void event_sample_reaction(TransportState &state);
 void event_process_collision(TransportState &state);
 void event_compact_bank(ParticleBank &bank);
-void score_flux(TransportState &state);
 void comb_bank(ParticleBank &bank, int n_target, RNG &rng);
 void init_source(TransportState &state, int n_particles, bool fixed_source,
                  const double FIXED_SOURCE_ENERGY);
 void transport_cycle(TransportState &state);
-void flush_tally_buffer(TransportState &state);

@@ -23,7 +23,8 @@ set ures 0
 % set xsplot 11 0 10
 
 % --- cross section library --- %
-set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
+% set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
+set acelib "Users/shrestha/endfb71/s2v0_endfb71.xsdata"
 
 % --- neutron population and criticality cycles --- %
 set pop 10000 1000 100

@@ -138,27 +138,6 @@ void comb_bank(ParticleBank &bank, int n_target, RNG &rng) {
   bank = std::move(combed);
 }
 
-void score_flux(TransportState &state) {
-  for (const auto &neutron : state.current_bank) {
-    if (!neutron.alive)
-      continue;
-    if (!std::isfinite(neutron.macro_xs_t) || neutron.macro_xs_t <= 0.0)
-      continue;
-    double score = neutron.w / neutron.macro_xs_t;
-    state.tally_buffer.push_back(neutron.E);
-    state.tally_buffer.push_back(score);
-  }
-}
-
-void flush_tally_buffer(TransportState &state) {
-  if (!state.tally_file.is_open() || state.tally_buffer.empty())
-    return;
-  state.tally_file.write(
-      reinterpret_cast<const char *>(state.tally_buffer.data()),
-      static_cast<std::streamsize>(state.tally_buffer.size() * sizeof(double)));
-  state.tally_buffer.clear();
-}
-
 void event_compact_bank(ParticleBank &bank) {
   auto it = std::partition(bank.begin(), bank.end(),
                            [](const Neutron &p) { return p.alive; });
@@ -216,11 +195,7 @@ void transport_cycle(TransportState &state) {
       neutron.y += distance * neutron.Omega_y;
       neutron.z += distance * neutron.Omega_z;
 
-      if (state.scoring_active) {
-        double score = neutron.w / neutron.macro_xs_t;
-        state.tally_buffer.push_back(neutron.E);
-        state.tally_buffer.push_back(score);
-      }
+      state.tallies.score_collision(neutron, *state.material, *state.data);
 
       const NuclideDescriptor &nuc =
           state.data->nuclides[neutron.rxn.nuclide_idx];

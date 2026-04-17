@@ -23,6 +23,7 @@ struct NuclideDescriptor {
   int n_reactions;
   int zaid;
   double temperature; // temperature (K) at which this data was loaded
+  int kappa_id;
 };
 
 struct ReactionDescriptor {
@@ -52,6 +53,11 @@ struct DelayedFissionDescriptor {
   int group_offset; // into delayed neutron groups
   int n_groups;
 };
+
+struct KappaDescriptor {
+  double coeffs[3];
+};
+
 
 // Distribution pools
 
@@ -124,6 +130,8 @@ struct NuclearData {
   int n_delayed_groups;
   const DelayedFissionDescriptor *delayed_fission_descs;
   int n_delayed_fission_descs;
+  const KappaDescriptor *kappa_descs;
+  int n_kappa_descs;
 };
 
 // Host side owning container
@@ -178,11 +186,12 @@ struct NuclearDataHost {
   std::vector<DelayedNeutronGroupDescriptor> delayed_groups;
   std::vector<DelayedFissionDescriptor> delayed_fission_descs;
 
+  // Recoverable fission energy metadata
+  std::vector<KappaDescriptor> kappa_descs;
+
   NuclearData view() const;
 };
 
-// Load from binary file produced by extract_hdf5.py
-NuclearDataHost load_nuclear_data(const std::string &path);
 
 // Load directly from OpenMC HDF5 files, driven by material definitions.
 // Only loads nuclides referenced by the given materials, at their temperatures.

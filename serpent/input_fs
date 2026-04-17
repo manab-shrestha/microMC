@@ -17,8 +17,11 @@ set bc 2
 % --- Cross section library --- %
 set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
 
+% --- disable group constants --- %
+set gcu -1
+
 % --- Fixed source calculation --- %
-set nps 1000000 1000
+set nps 5000000 1
 src s1 n sp 0.0 0.0 0.0 se 0.5
 
 % --- Normalisation --- %

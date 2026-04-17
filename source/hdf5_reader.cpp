@@ -621,6 +621,26 @@ NuclearDataHost load_nuclear_data_hdf5(const std::string &hdf5_dir,
 
     int n_reactions = static_cast<int>(h.reactions.size()) - rxn_offset;
 
+    int kappa_id = -1;
+    if (has_child(nuc, "fission_energy_release")) {
+      H5::Group fer = nuc.openGroup("fission_energy_release");
+      if (has_child(fer, "q_recoverable")) {
+        H5::DataSet q_ds = fer.openDataSet("q_recoverable");
+        auto q = read_1d_double(q_ds); 
+        if (q.size() != 3) {
+          throw std::runtime_error{"Expected 3 polynomial coefficients in q_recoverable for " + nuc_name + " recieved " + std::to_string(q.size())}; 
+        }
+
+        KappaDescriptor kd{};
+        kd.coeffs[0] = q[0];
+        kd.coeffs[1] = q[1];
+        kd.coeffs[2] = q[2];
+
+        kappa_id = static_cast<int>(h.kappa_descs.size());
+        h.kappa_descs.push_back(kd);
+      }
+    }
+
     NuclideDescriptor nd{};
     nd.grid_offset = grid_offset;
     nd.grid_length = grid_length;
@@ -629,6 +649,7 @@ NuclearDataHost load_nuclear_data_hdf5(const std::string &hdf5_dir,
     nd.n_reactions = n_reactions;
     nd.zaid = zaid;
     nd.temperature = req_temp;
+    nd.kappa_id = kappa_id;
     h.nuclides.push_back(nd);
 
     std::cout << "Loaded " << std::left << std::setw(9) << nuc_name

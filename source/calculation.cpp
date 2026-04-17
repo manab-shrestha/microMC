@@ -1,11 +1,72 @@
 #include "calculation.h"
+#include "tally.h"
 #include "transport.h"
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
+
+namespace {
+
+std::string lower_ascii(std::string s) {
+  for (char &c : s)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return s;
+}
+
+std::vector<TallySpec> default_tally_specs() {
+  GridDimSpec energy;
+  energy.dim = GridDim::ENERGY;
+  energy.spacing = GridSpacing::UNIFORM_LETHARGY;
+  energy.min_eV = 1.0e-5;
+  energy.max_eV = 1.0e7;
+  energy.n_bins = 500;
+  energy.outside_policy = GridOutsidePolicy::DROP;
+
+  TallyGridSpec grid;
+  grid.dims.push_back(energy);
+
+  std::vector<TallySpec> specs;
+
+  TallySpec flux;
+  flux.name = "flux_all";
+  flux.quantity = TallyQuantity::FLUX;
+  flux.grid = grid;
+  specs.push_back(flux);
+
+  const std::vector<RxnType> all_rxn_types = {
+      RxnType::ELASTIC, RxnType::DISCRETE_INELASTIC,
+      RxnType::CONTINUUM_INELASTIC, RxnType::FISSION,
+      RxnType::ABSORPTION, RxnType::N2N, RxnType::N3N};
+
+  for (RxnType rxn : all_rxn_types) {
+    TallySpec rr;
+    rr.name = "rxn_rate_" + lower_ascii(rxn_type_name(rxn));
+    rr.quantity = TallyQuantity::RXN_RATE;
+    rr.reactions.types = {rxn};
+    rr.grid = grid;
+    specs.push_back(rr);
+  }
+
+  TallySpec nu_f;
+  nu_f.name = "nu_fission_all";
+  nu_f.quantity = TallyQuantity::NU_FISSION;
+  nu_f.grid = grid;
+  specs.push_back(nu_f);
+
+  TallySpec kappa_f;
+  kappa_f.name = "kappa_fission_all";
+  kappa_f.quantity = TallyQuantity::KAPPA_FISSION;
+  kappa_f.grid = grid;
+  specs.push_back(kappa_f);
+
+  return specs;
+}
+
+} // namespace
 
 // ── Helper: pirint cycle summary to stdout ──────────────────────────
 static void print_cycle_summary(int cycle, int n_inactive, int n_active,
@@ -39,7 +100,8 @@ static void print_cycle_summary(int cycle, int n_inactive, int n_active,
 
 void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
                             int n_particles, int n_inactive, int n_active,
-                            uint64_t seed, bool flux_detector) {
+                            uint64_t seed, bool tally_on,
+                            const std::vector<TallySpec> &tally_specs) {
   TransportState state;
   state.material = &mat;
   state.data = &data;
@@ -47,18 +109,20 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
   state.k_eff = 1.0;
   state.cycle = 0;
   state.k_eff_history.reserve(n_inactive + n_active);
-  if (flux_detector) {
-    state.tally_file.open("tallies/flux_tally.bin", std::ios::binary);
-    if (!state.tally_file)
-      throw std::runtime_error("Failed to open tallies/flux_tally.bin");
-    state.tally_buffer.reserve(static_cast<size_t>(n_particles) * 4);
-  }
+  if (tally_on)
+    state.tallies.configure(mat, data,
+                           tally_specs.empty() ? default_tally_specs()
+                                               : tally_specs);
 
   init_source(state, n_particles, false, 0.0);
   auto start = std::chrono::steady_clock::now();
 
   double k_sum = 0.0, k_sum_sq = 0.0;
   int n_active_so_far = 0;
+  std::vector<double> k_eff_active_history;
+  std::vector<double> k_eff_active_rel_err_history;
+  k_eff_active_history.reserve(n_active);
+  k_eff_active_rel_err_history.reserve(n_active);
 
   std::cout << std::fixed << std::setprecision(5);
 
@@ -73,13 +137,10 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
       throw std::runtime_error(
           "Source bank extinction: non-positive source weight");
 
-    state.scoring_active = (c >= n_inactive) && flux_detector;
-    if (state.scoring_active)
-      state.tally_buffer.clear();
+    state.tallies.begin_cycle((c >= n_inactive) && tally_on);
 
     transport_cycle(state);
-    if (state.scoring_active)
-      flush_tally_buffer(state);
+    state.tallies.end_cycle();
 
     double w_fission = 0.0;
     for (const auto &particle : state.fission_bank)
@@ -103,6 +164,7 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
       ++n_active_so_far;
       k_sum += state.k_eff;
       k_sum_sq += state.k_eff * state.k_eff;
+      k_eff_active_history.push_back(state.k_eff);
     }
 
     if (active) {
@@ -114,6 +176,7 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
         variance = std::max(variance, 0.0);
         rel_unc = std::sqrt(variance) / mean;
       }
+      k_eff_active_rel_err_history.push_back(rel_unc);
       print_cycle_summary(c, n_inactive, n_active, state.k_eff, true, mean,
                           rel_unc);
     } else {
@@ -129,28 +192,55 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
   std::cout << "\nk-eigenvalue calculation completed in: "
             << elapsed.count() / 1000.0 << " seconds.\n";
 
-  state.tally_file.close();
+  if (tally_on) {
+    double final_mean = 0.0;
+    double final_rel_err = 0.0;
+    if (n_active_so_far > 0) {
+      final_mean = k_sum / n_active_so_far;
+      if (n_active_so_far > 1 && final_mean != 0.0) {
+        double variance =
+            (k_sum_sq / n_active_so_far - final_mean * final_mean) /
+            n_active_so_far;
+        variance = std::max(variance, 0.0);
+        final_rel_err = std::sqrt(variance) / final_mean;
+      }
+    }
+
+    RunMetadata meta;
+    meta.mode = "k_eigenvalue";
+    meta.n_particles = n_particles;
+    meta.n_inactive = n_inactive;
+    meta.n_active = n_active;
+    meta.seed = seed;
+    meta.material_name = std::string(mat.name);
+    meta.temperature_K = mat.temperature;
+    meta.k_eff_active_history = std::move(k_eff_active_history);
+    meta.k_eff_active_rel_err_history = std::move(k_eff_active_rel_err_history);
+    meta.k_eff_final_mean = final_mean;
+    meta.k_eff_final_rel_err = final_rel_err;
+
+    TallyOutputOptions out;
+    out.file_path = "tallies/k_eigenvalue_tallies.json";
+    state.tallies.write_json(meta, mat, data, out);
+  }
 }
 
 void calculate_fixed_source(const Material &mat, const NuclearData &data,
                             int n_particles, const double FIXED_SOURCE_ENERGY,
-                            int n_active, uint64_t seed, bool flux_detector) {
+                            int n_active, uint64_t seed, bool tally_on,
+                            const std::vector<TallySpec> &tally_specs) {
   TransportState state;
   state.material = &mat;
   state.data = &data;
   state.rng = RNG(seed);
   state.cycle = 0;
-  if (flux_detector) {
-    state.tally_file.open("tallies/fixed_src_flux_tally.bin", std::ios::binary);
-    if (!state.tally_file)
-      throw std::runtime_error(
-          "Failed to open tallies/fixed_src_flux_tally.bin");
-    state.tally_buffer.reserve(static_cast<size_t>(n_particles) * 4);
-  }
+  if (tally_on)
+    state.tallies.configure(mat, data,
+                           tally_specs.empty() ? default_tally_specs()
+                                               : tally_specs);
 
   auto start = std::chrono::steady_clock::now();
   std::cout << std::fixed << std::setprecision(5);
-  size_t n_scored_collisions = 0;
 
   for (int c = 0; c < n_active; ++c) {
     state.cycle = c;
@@ -167,15 +257,10 @@ void calculate_fixed_source(const Material &mat, const NuclearData &data,
       throw std::runtime_error(
           "Source bank extinction: non-positive source weight");
 
-    state.scoring_active = flux_detector;
-    if (state.scoring_active)
-      state.tally_buffer.clear();
+    state.tallies.begin_cycle(tally_on);
 
     transport_cycle(state);
-    if (state.scoring_active) {
-      n_scored_collisions += state.tally_buffer.size() / 2;
-      flush_tally_buffer(state);
-    }
+    state.tallies.end_cycle();
 
     state.fission_bank.clear();
   }
@@ -187,13 +272,18 @@ void calculate_fixed_source(const Material &mat, const NuclearData &data,
   std::cout << "\nFixed-source calculation completed in: "
             << elapsed.count() / 1000.0 << " seconds.\n";
 
-  if (flux_detector)
-    std::cout << "Scored collisions: " << n_scored_collisions << "\n";
+  if (tally_on) {
+    RunMetadata meta;
+    meta.mode = "fixed_source";
+    meta.n_particles = n_particles;
+    meta.n_inactive = 0;
+    meta.n_active = n_active;
+    meta.seed = seed;
+    meta.material_name = std::string(mat.name);
+    meta.temperature_K = mat.temperature;
 
-  if (flux_detector && n_scored_collisions == 0)
-    throw std::runtime_error(
-        "Fixed-source run produced zero scored collisions; check material "
-        "resolution and source settings");
-
-  state.tally_file.close();
+    TallyOutputOptions out;
+    out.file_path = "tallies/fixed_source_tallies.json";
+    state.tallies.write_json(meta, mat, data, out);
+  }
 }
