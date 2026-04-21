@@ -14,7 +14,7 @@ std::vector<TallySpec> build_user_tallies() {
   energy_grid.spacing = GridSpacing::UNIFORM_LETHARGY;
   energy_grid.min_eV = 1.0e-5;
   energy_grid.max_eV = 20.0e6;
-  energy_grid.n_bins = 5000;
+  energy_grid.n_bins = 500;
   energy_grid.outside_policy = GridOutsidePolicy::DROP;
 
   TallyGridSpec grid;
@@ -53,10 +53,10 @@ std::vector<TallySpec> build_user_tallies() {
   tallies.push_back(el_rr);
 
   TallySpec inel_rr;
-  inel_rr.name = "inela_rate_h1";
+  inel_rr.name = "inela_rate_u238";
   inel_rr.quantity = TallyQuantity::RXN_RATE;
-  inel_rr.reactions.types = {RxnType::ABSORPTION};
-  inel_rr.nuclides.zaids = {1001};
+  inel_rr.reactions.types = {RxnType::CONTINUUM_INELASTIC, RxnType::DISCRETE_INELASTIC};
+  inel_rr.nuclides.zaids = {92238};
   inel_rr.grid = grid;
   tallies.push_back(inel_rr);
 
@@ -79,6 +79,7 @@ std::vector<TallySpec> build_user_tallies() {
 
 int main(int argc, char *argv[]) {
   bool tally_on = (argc > 1 && std::string(argv[1]) == "true");
+  bool use_soa = (argc > 2 && std::string(argv[2]) == "soa");
 
   std::vector<TallySpec> tallies = build_user_tallies();
 
@@ -89,17 +90,17 @@ int main(int argc, char *argv[]) {
                    {0.4940, 0.3461, 0.005678, 0.1541}};
 
   Material absorber = {"absorber",
-                       -10.49,
-                       900.0,
-                       {1001, 8016, 92235, 92238, 5010},
-                       {0.4940, 0.3461, 0.005678, 0.1541, 0.000325}};
+                   -10.49,
+                    900.0,
+                    {1001, 8016, 92235, 92238, 5010},
+                    {0.4940, 0.3461, 0.005678, 0.1541, 0.000325}};
 
   Material water = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
 
   Material *all_mats[] = {&fuel, &absorber, &water};
 
-  // const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
-  const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron";
+   const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
+  //const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron";
 
   NuclearDataHost host;
   try {
@@ -119,11 +120,12 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    calculate_k_eigenvalue(fuel, data, 10000, 20, 200, 666, tally_on, tallies);
+    calculate_k_eigenvalue(fuel, data, 1e5, 50, 500, 123456789, tally_on, tallies,
+                           use_soa);
     // calculate_k_eigenvalue(absorber, data, 10000, 10, 1000, 1, tally_on,
-    //                        tallies);
-    // calculate_fixed_source(water, data, 5e4, 5.0e5, 100, 1, tally_on,
-    //                        tallies);
+    //                        tallies, use_soa);
+    // calculate_fixed_source(water, data, 50000, 5.0e5, 100, 1, tally_on,
+    //                        tallies, use_soa);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;

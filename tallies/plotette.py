@@ -46,7 +46,7 @@ plt.xscale("log")
 # plt.yscale("log")  # optional
 
 plt.xlabel("Energy (MeV)")
-plt.ylabel(r"fission rate$")
+plt.ylabel(r"$\hat{t}$")
 
 plt.legend()
 
