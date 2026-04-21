@@ -1,7 +1,6 @@
 #pragma once
 
 #include "material.h"
-#include "neutron.h"
 #include "nuclear_data.h"
 
 #include <cstdint>
@@ -116,8 +115,8 @@ public:
                  const std::vector<TallySpec> &specs);
 
   void begin_cycle(bool active_cycle);
-  void score_collision(const Neutron &neutron, const Material &mat,
-                       const NuclearData &data);
+  void score_collision(double E, double w, double macro_xs_t,
+                       const Material &mat, const NuclearData &data);
   void end_cycle();
 
   int n_active_cycles() const;

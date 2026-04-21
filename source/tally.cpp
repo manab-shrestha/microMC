@@ -522,12 +522,13 @@ void TallyManager::begin_cycle(bool active_cycle) {
     std::fill(s.cycle_sum.begin(), s.cycle_sum.end(), 0.0);
 }
 
-void TallyManager::score_collision(const Neutron &neutron, const Material &mat,
+void TallyManager::score_collision(double E, double w, double macro_xs_t,
+                                   const Material &mat,
                                    const NuclearData &data) {
   if (!scoring_active_)
     return;
-  if (!(neutron.macro_xs_t > 0.0) || !std::isfinite(neutron.macro_xs_t) ||
-      !std::isfinite(neutron.w) || !std::isfinite(neutron.E)) {
+  if (!(macro_xs_t > 0.0) || !std::isfinite(macro_xs_t) || !std::isfinite(w) ||
+      !std::isfinite(E)) {
     return;
   }
 
@@ -535,8 +536,7 @@ void TallyManager::score_collision(const Neutron &neutron, const Material &mat,
     if (!material_enabled_[t])
       continue;
 
-    const int bin =
-        locate_energy_bin(grid_edges_eV_[t], neutron.E, outside_policies_[t]);
+    const int bin = locate_energy_bin(grid_edges_eV_[t], E, outside_policies_[t]);
     if (bin < 0)
       continue;
 
@@ -553,28 +553,27 @@ void TallyManager::score_collision(const Neutron &neutron, const Material &mat,
         multiplier = 1.0;
       } else {
         const double sigma_t_filtered =
-            macro_total_filtered(mat, data, neutron.E, slots);
-        multiplier = sigma_t_filtered / neutron.macro_xs_t;
+            macro_total_filtered(mat, data, E, slots);
+        multiplier = sigma_t_filtered / macro_xs_t;
         multiplier = std::clamp(multiplier, 0.0, 1.0);
       }
       break;
     }
     case TallyQuantity::RXN_RATE:
-      multiplier =
-          macro_rxn_rate_filtered(mat, data, neutron.E, slots, rxn_filters_[t]);
+      multiplier = macro_rxn_rate_filtered(mat, data, E, slots, rxn_filters_[t]);
       break;
     case TallyQuantity::NU_FISSION:
-      multiplier = macro_nu_fission_filtered(mat, data, neutron.E, slots);
+      multiplier = macro_nu_fission_filtered(mat, data, E, slots);
       break;
     case TallyQuantity::KAPPA_FISSION:
-      multiplier = macro_kappa_fission_filtered(mat, data, neutron.E, slots);
+      multiplier = macro_kappa_fission_filtered(mat, data, E, slots);
       break;
     }
 
     if (!(multiplier > 0.0) || !std::isfinite(multiplier))
       continue;
 
-    const double score = neutron.w * multiplier / neutron.macro_xs_t;
+    const double score = w * multiplier / macro_xs_t;
     if (!std::isfinite(score))
       continue;
 

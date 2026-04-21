@@ -86,58 +86,6 @@ struct ParticleBankHost {
 
   void clear_active() { size = 0; };
 
-  void reserve(int n) {
-    if (n < 0)
-      throw std::runtime_error("ParticleBankHost::reserve negative n");
-    if (n <= capacity)
-      return;
-    capacity = n;
-
-    x.reserve(n);
-    y.reserve(n);
-    z.reserve(n);
-    E.reserve(n);
-    Omega_x.reserve(n);
-    Omega_y.reserve(n);
-    Omega_z.reserve(n);
-    w.reserve(n);
-    macro_xs_t.reserve(n);
-    alive.reserve(n);
-    rxn_nuclide_idx.reserve(n);
-    rxn_rxn_idx.reserve(n);
-    rxn_type.reserve(n);
-    rng.reserve(n);
-  };
-
-  void resize(int n) {
-    if (n < 0)
-      throw std::runtime_error("ParticleBankHost::resize negative n");
-    if (n > capacity)
-      set_capacity(n);
-
-    size = n;
-
-    x.resize(n);
-    y.resize(n);
-    z.resize(n);
-    E.resize(n);
-    Omega_x.resize(n);
-    Omega_y.resize(n);
-    Omega_z.resize(n);
-    w.resize(n);
-    macro_xs_t.resize(n);
-    alive.resize(n);
-    rxn_nuclide_idx.resize(n);
-    rxn_rxn_idx.resize(n);
-    rxn_type.resize(n);
-    rng.resize(n);
-  };
-
-  void clear() {
-    size = 0;
-    resize(0);
-  };
-
   ParticleBankView view() {
     return ParticleBankView{
         x.data(),

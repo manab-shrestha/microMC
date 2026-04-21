@@ -41,10 +41,11 @@ The codebase is structured around a flat, SoA-friendly nuclear data representati
 | `material.{h,cpp}` | `Material` struct, density conversion, `total_macro_xs` |
 | `sampling.{h,cpp}` | CDF sampling, angular/Kalbach/fission distributions, `sample_reaction` |
 | `direction.{h,cpp}` | `sample_isodir`, `rotate_dir` (direction sampling/rotation) |
-| `neutron.h` | `Neutron` struct, `ParticleBank` typedef |
-| `reaction.{h,cpp}` | Collision handlers: elastic, inelastic, fission, capture, multiply |
-| `transport.{h,cpp}` | Event loop, eigenvalue driver, bank management |
-| `atomic_mass.{h,cpp}` | ENDF/B-VII.1 atomic mass table lookup |
+| `particle_bank.h` | SoA particle-bank owner/view structs and helpers |
+| `collision.{h,cpp}` | Collision handlers: elastic, inelastic, fission, multiply |
+| `transport_driver.{h,cpp}` | Transport loop, bank management, source/combing |
+| `eigenvalue_calculator.cpp` | k-eigenvalue driver |
+| `fixed_source_calculator.cpp` | fixed-source driver |
 | `rng.h` | RNG type alias and `uniform()` |
 
 **Naming conventions:**
@@ -70,4 +71,4 @@ The codebase is structured around a flat, SoA-friendly nuclear data representati
 
 **Current nuclides:** H1 (1001), O16 (8016), U235 (92235), U238 (92238) — UO2+H2O mix.
 
-**Particle struct** (`include/neutron.h`): position (x,y,z), energy E, direction (Omega_x/y/z), weight w, alive flag — currently AoS, SoA conversion is a future goal.
+Particle state is SoA in `include/particle_bank.h` with `ParticleBankHost` ownership and `ParticleBankView` POD-style views used in transport/collision code.

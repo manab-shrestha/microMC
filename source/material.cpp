@@ -1,5 +1,4 @@
 #include "material.h"
-#include "atomic_mass.h"
 #include "nuclear_data.h"
 #include "xs_lookup.h"
 
@@ -9,6 +8,7 @@
 
 namespace {
 constexpr double N_A_BARN_CM = 0.602214076; // Avogadro's number in barn-cm
+constexpr double NEUTRON_MASS_AMU = 1.00866491595;
 
 int infer_n_nuclides(const Material &mat) {
   int first_zero = MAX_NUCLIDES_PER_MATERIAL;
@@ -99,7 +99,7 @@ void resolve_material(Material &mat, const NuclearData &data) {
   // Look up atomic masses (amu) for each nuclide
   double M[MAX_NUCLIDES_PER_MATERIAL];
   for (int i = 0; i < mat.n_nuclides; ++i)
-    M[i] = mendeleev::atomic_mass(mat.zaids[i]);
+    M[i] = data.nuclides[mat.nuclide_ids[i]].A * NEUTRON_MASS_AMU;
 
   if (mat.density == 0.0) {
     // "Sum" mode: number_quantity are number densities (10^24/cm3)

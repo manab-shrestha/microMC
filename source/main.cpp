@@ -7,7 +7,6 @@
 #include <string>
 
 namespace {
-// ene fine   3 1000 1e-11 20.0
 std::vector<TallySpec> build_user_tallies() {
   GridDimSpec energy_grid;
   energy_grid.dim = GridDim::ENERGY;
@@ -45,7 +44,7 @@ std::vector<TallySpec> build_user_tallies() {
   tallies.push_back(abs_rr);
 
   TallySpec el_rr;
-  el_rr.name = "ela_rate_o6";
+  el_rr.name = "ela_rate_o16";
   el_rr.quantity = TallyQuantity::RXN_RATE;
   el_rr.reactions.types = {RxnType::ELASTIC};
   el_rr.nuclides.zaids = {8016};
@@ -79,7 +78,6 @@ std::vector<TallySpec> build_user_tallies() {
 
 int main(int argc, char *argv[]) {
   bool tally_on = (argc > 1 && std::string(argv[1]) == "true");
-  bool use_soa = (argc > 2 && std::string(argv[2]) == "soa");
 
   std::vector<TallySpec> tallies = build_user_tallies();
 
@@ -90,17 +88,16 @@ int main(int argc, char *argv[]) {
                    {0.4940, 0.3461, 0.005678, 0.1541}};
 
   Material absorber = {"absorber",
-                   -10.49,
-                    900.0,
-                    {1001, 8016, 92235, 92238, 5010},
-                    {0.4940, 0.3461, 0.005678, 0.1541, 0.000325}};
+                       -10.49,
+                       900.0,
+                       {1001, 8016, 92235, 92238, 5010},
+                       {0.4940, 0.3461, 0.005678, 0.1541, 0.000325}};
 
   Material water = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
 
   Material *all_mats[] = {&fuel, &absorber, &water};
 
-   const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
-  //const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron";
+  const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
 
   NuclearDataHost host;
   try {
@@ -120,12 +117,8 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    calculate_k_eigenvalue(fuel, data, 1e5, 50, 500, 123456789, tally_on, tallies,
-                           use_soa);
-    // calculate_k_eigenvalue(absorber, data, 10000, 10, 1000, 1, tally_on,
-    //                        tallies, use_soa);
-    // calculate_fixed_source(water, data, 50000, 5.0e5, 100, 1, tally_on,
-    //                        tallies, use_soa);
+    calculate_k_eigenvalue(fuel, data, 1e5, 50, 200, 123456789, tally_on,
+                           tallies);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;

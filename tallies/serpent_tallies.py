@@ -33,7 +33,7 @@ det = serpentTools.read("../serpent/input_k_det0.m")
 
 # plt.legend()
 
-d = det.detectors["delastic_o"]
+d = det.detectors["dinelastic"]
 E = d.grids["E"] * 1e6  
 edges = np.r_[E[:,0], E[-1,1]]
 
