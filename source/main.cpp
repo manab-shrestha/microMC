@@ -98,6 +98,7 @@ int main(int argc, char *argv[]) {
   Material *all_mats[] = {&fuel, &absorber, &water};
 
   const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
+  //const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron";
 
   NuclearDataHost host;
   try {
@@ -117,7 +118,7 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    calculate_k_eigenvalue(fuel, data, 1e5, 50, 200, 123456789, tally_on,
+    calculate_k_eigenvalue(fuel, data, 1e5, 50, 500, 987654321, tally_on,
                            tallies);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';

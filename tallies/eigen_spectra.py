@@ -139,20 +139,9 @@ if hasattr(f, "errors") and f.errors is not None:
 # --- Plot ---
 fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(7, 10), sharex=True)
 
-# Top: linear y
-ax1.step(
-    bin_centres_eV,
-    phi_micromc,
-    where="mid",
-    label="microMC"
-)
-ax1.step(
-    bin_centres_eV,
-    phi_serpent,
-    where="mid",
-    ls="--",
-    label="Serpent"
-)
+# Top: linear y (plot over bin edges)
+ax1.stairs(phi_micromc, edges_eV, label="microMC")
+ax1.stairs(phi_serpent, edges_eV, ls="--", label="Serpent")
 ax1.set_xscale("log")
 ax1.set_ylabel(r"$\phi$")
 ax1.legend()
@@ -171,11 +160,8 @@ if combined_sigma is not None:
         label=r"Combined $\pm 2\sigma$",
     )
 
-ax3.plot(
-    bin_centres_eV[mask_rel],
-    rel_diff[mask_rel],
-    linewidth=1.0,
-)
+rel_diff_plot = np.where(mask_rel, rel_diff, np.nan)
+ax3.stairs(rel_diff_plot, edges_eV, linewidth=1.0, label="Relative difference")
 ax3.axhline(0.0, color="black", linewidth=0.8, alpha=0.7)
 ax3.set_xscale("log")
 ax3.set_xlabel("Energy (eV)")
@@ -184,20 +170,11 @@ ax3.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0))
 ax3.set_ylim(-0.1, 0.1)
 ax3.legend()
 
-# Bottom: log y
-ax2.step(
-    bin_centres_eV[mask_micromc],
-    phi_micromc[mask_micromc],
-    where="mid",
-    label="microMC"
-)
-ax2.step(
-    bin_centres_eV[mask_serpent],
-    phi_serpent[mask_serpent],
-    where="mid",
-    ls="--",
-    label="Serpent"
-)
+# Bottom: log y (plot over bin edges)
+phi_micromc_log = np.where(mask_micromc, phi_micromc, np.nan)
+phi_serpent_log = np.where(mask_serpent, phi_serpent, np.nan)
+ax2.stairs(phi_micromc_log, edges_eV, label="microMC")
+ax2.stairs(phi_serpent_log, edges_eV, ls="--", label="Serpent")
 ax2.set_xscale("log")
 ax2.set_yscale("log")
 ax2.set_ylabel(r"$\phi$")

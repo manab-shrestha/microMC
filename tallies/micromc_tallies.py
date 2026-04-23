@@ -206,7 +206,8 @@ def plot_tally_spectrum(tally: dict, out_png: Path | None, show: bool) -> None:
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(7, 8), sharex=True)
 
     # Top: linear y spectrum
-    ax1.step(centers, mean, where="mid", label="mean")
+    tally_name = tally.get("name", "tally")
+    ax1.step(centers, mean, where="mid", label=tally_name)
     if std_err.size == mean.size:
         lo = np.maximum(mean - std_err, 0.0)
         hi = mean + std_err
@@ -218,7 +219,7 @@ def plot_tally_spectrum(tally: dict, out_png: Path | None, show: bool) -> None:
     # Bottom: log y spectrum
     mask = mean > 0.0
     if np.any(mask):
-        ax2.step(centers[mask], mean[mask], where="mid", label="mean")
+        ax2.step(centers[mask], mean[mask], where="mid", label=tally_name)
     ax2.set_xscale("log")
     ax2.set_yscale("log")
     ax2.set_xlabel("Energy (eV)")

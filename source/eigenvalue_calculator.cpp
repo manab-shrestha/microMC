@@ -60,7 +60,8 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
   init_source(state, n_particles, false, 0.0);
   auto start = std::chrono::steady_clock::now();
 
-  double k_sum = 0.0, k_sum_sq = 0.0;
+  double k_sum = 0.0;
+  double k_sum_sq = 0.0;
   int n_active_so_far = 0;
   std::vector<double> k_eff_active_history;
   std::vector<double> k_eff_active_rel_err_history;

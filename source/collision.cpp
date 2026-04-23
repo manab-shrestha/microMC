@@ -245,7 +245,8 @@ void fission(ParticleBankView bank, int i, const ReactionDescriptor &rxn,
   bank.alive[i] = 0;
 }
 
-void multiply(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
+/*
+void multiply_analog(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
               const ReactionDescriptor &rxn, const NuclearData &data,
               double temperature, ParticleBankView secondary_bank,
               int &secondary_count) {
@@ -324,3 +325,53 @@ void multiply(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
     secondary_bank.rng[slot] = RNG(rng());
   }
 }
+*/
+
+void multiply_imp(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
+              const ReactionDescriptor &rxn, const NuclearData &data,
+              double temperature) {
+  RNG &rng = bank.rng[i];
+  const double A = nuc.A;
+
+  const double E_inc = bank.E[i];
+  const double v_mag = std::sqrt(2.0 * E_inc * EV_TO_J / M_N);
+  const double vx = v_mag * bank.Omega_x[i];
+  const double vy = v_mag * bank.Omega_y[i];
+  const double vz = v_mag * bank.Omega_z[i];
+
+  Velocity V = sample_target_velocity(A, temperature, rng);
+
+  const double gx = vx - V.x;
+  const double gy = vy - V.y;
+  const double gz = vz - V.z;
+  const double g = std::sqrt(gx * gx + gy * gy + gz * gz);
+  if (g <= EPS) {
+    bank.alive[i] = 0;
+    return;
+  }
+
+  const double ghat_x = gx / g;
+  const double ghat_y = gy / g;
+  const double ghat_z = gz / g;
+
+  const double vcm_x = (vx + A * V.x) / (A + 1.0);
+  const double vcm_y = (vy + A * V.y) / (A + 1.0);
+  const double vcm_z = (vz + A * V.z) / (A + 1.0);
+
+  KalbachResult result =
+      sample_kalbach_mann(data.kalbach, rxn.dist_id, E_inc, rng);
+  double out_dir_x, out_dir_y, out_dir_z;
+  sample_cm_direction_from_axis(ghat_x, ghat_y, ghat_z, result.mu, rng,
+                                out_dir_x, out_dir_y, out_dir_z);
+  {
+    const double v_out_cm = std::sqrt(2.0 * result.E_out * EV_TO_J / M_N);
+    const double vpx = vcm_x + v_out_cm * out_dir_x;
+    const double vpy = vcm_y + v_out_cm * out_dir_y;
+    const double vpz = vcm_z + v_out_cm * out_dir_z;
+    set_particle_from_velocity(bank, i, vpx, vpy, vpz);
+    bank.w[i] *= rxn.multiplicity
+  }
+
+}
+
+

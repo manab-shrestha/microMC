@@ -10,10 +10,10 @@
 struct TransportState {
   ParticleBankHost current_bank;
   ParticleBankHost fission_bank;
-  ParticleBankHost secondary_bank;
+  //ParticleBankHost secondary_bank;
 
   int fission_count{0};
-  int secondary_count{0};
+  //int secondary_count{0};
   const Material *material{nullptr};
   const NuclearData *data{nullptr};
 
