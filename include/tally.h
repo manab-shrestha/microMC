@@ -16,6 +16,9 @@ enum class TallyQuantity : int {
 
 enum class GridDim : int {
   ENERGY = 0,
+  X = 1,
+  Y = 2,
+  Z = 3,
 };
 
 enum class GridSpacing : int {
@@ -50,11 +53,11 @@ struct GridDimSpec {
   GridSpacing spacing{GridSpacing::CUSTOM_EDGES};
 
   // CUSTOM_EDGES mode
-  std::vector<double> bin_edges_eV;
+  std::vector<double> bin_edges;
 
   // Generated grid modes (UNIFORM_LINEAR, UNIFORM_LETHARGY, UNIFORM_LOG10)
-  double min_eV{0.0};
-  double max_eV{0.0};
+  double min{0.0};
+  double max{0.0};
   int n_bins{0};
 
   GridOutsidePolicy outside_policy{GridOutsidePolicy::DROP};
@@ -115,7 +118,8 @@ public:
                  const std::vector<TallySpec> &specs);
 
   void begin_cycle(bool active_cycle);
-  void score_collision(double E, double w, double macro_xs_t,
+  void score_collision(double x, double y, double z, double E, double w,
+                       double macro_xs_t,
                        const Material &mat, const NuclearData &data);
   void end_cycle();
 
@@ -129,10 +133,9 @@ public:
 
 private:
   std::vector<TallySpec> specs_;
-  std::vector<std::vector<double>> grid_edges_eV_;
-  std::vector<int> grid_n_bins_;
+  std::vector<std::vector<std::vector<double>>> grid_edges_;
   std::vector<std::vector<int>> grid_shapes_;
-  std::vector<GridOutsidePolicy> outside_policies_;
+  std::vector<std::vector<GridOutsidePolicy>> outside_policies_;
   std::vector<bool> material_enabled_;
   std::vector<std::vector<int>> selected_mat_slots_;
   std::vector<std::vector<RxnType>> rxn_filters_;

@@ -9,26 +9,39 @@
 namespace {
 constexpr double MAX_SOURCE_ENERGY = 1.0e7; // eV
 constexpr double MIN_UNIFORM = 1e-16;
+constexpr int FISSION_BANK_SAFETY_FACTOR = 8;
 
-inline void copy_particle_between(ParticleBankView dst, int dst_i,
-                                  ParticleBankView src, int src_i) {
-  dst.x[dst_i] = src.x[src_i];
-  dst.y[dst_i] = src.y[src_i];
-  dst.z[dst_i] = src.z[src_i];
-  dst.E[dst_i] = src.E[src_i];
-  dst.Omega_x[dst_i] = src.Omega_x[src_i];
-  dst.Omega_y[dst_i] = src.Omega_y[src_i];
-  dst.Omega_z[dst_i] = src.Omega_z[src_i];
-  dst.w[dst_i] = src.w[src_i];
-  dst.macro_xs_t[dst_i] = src.macro_xs_t[src_i];
-  dst.alive[dst_i] = src.alive[src_i];
-  dst.rxn_nuclide_idx[dst_i] = src.rxn_nuclide_idx[src_i];
-  dst.rxn_rxn_idx[dst_i] = src.rxn_rxn_idx[src_i];
-  dst.rxn_type[dst_i] = src.rxn_type[src_i];
-  dst.rng[dst_i] = src.rng[src_i];
+void reserve_fission_bank(TransportState &state) {
+  const int required = state.fission_bank.size +
+                       state.current_bank.size * FISSION_BANK_SAFETY_FACTOR;
+
+  if (state.fission_bank.capacity < required)
+    state.fission_bank.set_capacity(required);
 }
-
 } // namespace
+
+namespace GEO{
+bool inside_julia_xy(double x, double y) {
+  constexpr double center_x = 0.0;
+  constexpr double center_y = 0.0;
+  constexpr double physical_half_width = 5.0;
+  constexpr double julia_half_width = 1.5;
+  constexpr double cr = -0.5, ci = 0.5;
+  constexpr int n = 128;
+  if (!std::isfinite(x) || !std::isfinite(y))
+    return false;
+  double zr = (x - center_x) * julia_half_width / physical_half_width;
+  double zi = (y - center_y) * julia_half_width / physical_half_width;
+  for (int i = 0; i < n; ++i) {
+    const double zr2 = zr * zr - zi * zi + cr;
+    zi = 2.0 * zr * zi + ci;
+    zr = zr2;
+    if (zr * zr + zi * zi > 4.0)
+      return false;
+  }
+  return true;
+}
+}
 
 void advance(TransportState &state) {
   const int n = state.current_bank.size;
@@ -75,35 +88,26 @@ void sample_reaction(TransportState &state) {
   }
 }
 
-void process_collision(TransportState &state) {
+void kill_out_of_bounds(TransportState &state){
+  const int n = state.current_bank.size;
+  ParticleBankView bank = state.current_bank.view();
+  for(int i = 0; i < n; ++i){
+    if (!GEO::inside_julia_xy(bank.x[i],bank.y[i])) bank.alive[i] = 0;
+  }
+}
+
+void collide(TransportState &state) {
   const int n = state.current_bank.size;
   ParticleBankView bank = state.current_bank.view();
   ParticleBankView fission_bank = state.fission_bank.view();
-  ParticleBankView secondary_bank = state.secondary_bank.view();
-
-  ParticleBankHost next_bank_host;
-  next_bank_host.set_capacity(n + n / 8 + 16);
-  next_bank_host.set_size(0);
-  ParticleBankView next_bank = next_bank_host.view();
-  int next_count = 0;
-
-  auto ensure_next_capacity = [&]() {
-    if (next_count < next_bank_host.capacity)
-      return;
-    int grown = std::max(next_bank_host.capacity * 2, next_count + 1);
-    if (grown <= 0)
-      grown = next_count + 1;
-    next_bank_host.set_capacity(grown);
-    next_bank = next_bank_host.view();
-  };
 
   state.fission_count = state.fission_bank.size;
-  state.secondary_count = 0;
   for (int i = 0; i < n; ++i) {
     if (!bank.alive[i])
       continue;
 
-    state.tallies.score_collision(bank.E[i], bank.w[i], bank.macro_xs_t[i],
+    state.tallies.score_collision(bank.x[i], bank.y[i], bank.z[i], bank.E[i],
+                                  bank.w[i], bank.macro_xs_t[i],
                                   *state.material, *state.data);
 
     const int nuclide_idx = bank.rxn_nuclide_idx[i];
@@ -111,7 +115,6 @@ void process_collision(TransportState &state) {
     const NuclideDescriptor &nuc = state.data->nuclides[nuclide_idx];
     const ReactionDescriptor &rxn = state.data->reactions[rxn_idx];
     const RxnType type = static_cast<RxnType>(bank.rxn_type[i]);
-    const int secondary_begin = state.secondary_count;
 
     switch (type) {
     case RxnType::ELASTIC:
@@ -134,36 +137,30 @@ void process_collision(TransportState &state) {
       bank.alive[i] = 0;
       break;
     case RxnType::N2N:
-      multiply(bank, i, nuc, rxn, *state.data, state.material->temperature,
-               secondary_bank, state.secondary_count);
+      multiply(bank, i, nuc, rxn, *state.data, state.material->temperature);
       break;
     case RxnType::N3N:
-      multiply(bank, i, nuc, rxn, *state.data, state.material->temperature,
-               secondary_bank, state.secondary_count);
+      multiply(bank, i, nuc, rxn, *state.data, state.material->temperature);
       break;
     }
+  }
+  state.fission_bank.set_size(state.fission_count);
+}
 
-    if (type == RxnType::N2N || type == RxnType::N3N) {
-      for (int s = secondary_begin; s < state.secondary_count; ++s) {
-        if (!secondary_bank.alive[s])
-          continue;
-        ensure_next_capacity();
-        copy_particle_between(next_bank, next_count, secondary_bank, s);
-        ++next_count;
-      }
-    }
+void compact_alive(TransportState &state) {
+  ParticleBankView bank = state.current_bank.view();
+  const int n = state.current_bank.size;
+  int write = 0;
 
-    if (bank.alive[i]) {
-      ensure_next_capacity();
-      copy_particle_between(next_bank, next_count, bank, i);
-      ++next_count;
-    }
+  for (int read = 0; read < n; ++read) {
+    if (!bank.alive[read])
+      continue;
+    if (write != read)
+      copy_particle_fields(bank, write, read);
+    ++write;
   }
 
-  next_bank_host.set_size(next_count);
-  state.current_bank = std::move(next_bank_host);
-  state.fission_bank.set_size(state.fission_count);
-  state.secondary_bank.set_size(state.secondary_count);
+  state.current_bank.set_size(write);
 }
 
 int comb_bank(ParticleBankHost &bank, int size, int n_target, RNG &cycle_rng) {
@@ -239,16 +236,11 @@ void init_source(TransportState &state, int n_particles, bool fixed_source,
 
 void transport_cycle(TransportState &state) {
   while (state.current_bank.size > 0) {
-    if (state.fission_bank.capacity < state.current_bank.size * 2)
-      state.fission_bank.set_capacity(state.current_bank.size * 2);
-    if (state.secondary_bank.capacity <
-        state.current_bank.size + state.current_bank.size / 8 + 16)
-      state.secondary_bank.set_capacity(state.current_bank.size + state.current_bank.size / 8 + 16);
-
+    reserve_fission_bank(state);
     sample_reaction(state);
     advance(state);
-    state.secondary_bank.clear_active();
-    process_collision(state);
-    state.secondary_bank.clear_active();
+    kill_out_of_bounds(state);
+    collide(state);
+    compact_alive(state);
   }
 }

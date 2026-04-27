@@ -149,6 +149,25 @@ inline void copy_particle_fields(ParticleBankView bank, int dst, int src) {
   bank.rng[dst] = bank.rng[src];
 }
 
+inline void copy_particle_between(ParticleBankView dst, int dst_i,
+                                  ParticleBankView src, int src_i) {
+  dst.x[dst_i] = src.x[src_i];
+  dst.y[dst_i] = src.y[src_i];
+  dst.z[dst_i] = src.z[src_i];
+  dst.E[dst_i] = src.E[src_i];
+  dst.Omega_x[dst_i] = src.Omega_x[src_i];
+  dst.Omega_y[dst_i] = src.Omega_y[src_i];
+  dst.Omega_z[dst_i] = src.Omega_z[src_i];
+  dst.w[dst_i] = src.w[src_i];
+  dst.macro_xs_t[dst_i] = src.macro_xs_t[src_i];
+  dst.alive[dst_i] = src.alive[src_i];
+  dst.rxn_nuclide_idx[dst_i] = src.rxn_nuclide_idx[src_i];
+  dst.rxn_rxn_idx[dst_i] = src.rxn_rxn_idx[src_i];
+  dst.rxn_type[dst_i] = src.rxn_type[src_i];
+  dst.rng[dst_i] = src.rng[src_i];
+}
+
+
 inline void init_particle_defaults(ParticleBankView bank, int i) {
   if (i < 0 || i >= bank.capacity)
     throw std::runtime_error("init_particle_defaults index out of bounds");

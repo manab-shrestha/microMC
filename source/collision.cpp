@@ -3,6 +3,7 @@
 #include "sampling.h"
 #include <cassert>
 #include <cmath>
+#include <stdexcept>
 
 namespace {
 
@@ -198,7 +199,7 @@ void fission(ParticleBankView bank, int i, const ReactionDescriptor &rxn,
   auto append_secondary = [&](double E_out) {
     const int slot = fission_count;
     if (slot >= fission_bank.capacity) {
-      return;
+      throw std::runtime_error("fission bank overflow");
     }
     ++fission_count;
 
@@ -245,89 +246,8 @@ void fission(ParticleBankView bank, int i, const ReactionDescriptor &rxn,
   bank.alive[i] = 0;
 }
 
-/*
-void multiply_analog(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
-              const ReactionDescriptor &rxn, const NuclearData &data,
-              double temperature, ParticleBankView secondary_bank,
-              int &secondary_count) {
-  RNG &rng = bank.rng[i];
-  const double A = nuc.A;
-
-  const double E_inc = bank.E[i];
-  const double v_mag = std::sqrt(2.0 * E_inc * EV_TO_J / M_N);
-  const double vx = v_mag * bank.Omega_x[i];
-  const double vy = v_mag * bank.Omega_y[i];
-  const double vz = v_mag * bank.Omega_z[i];
-
-  Velocity V = sample_target_velocity(A, temperature, rng);
-
-  const double gx = vx - V.x;
-  const double gy = vy - V.y;
-  const double gz = vz - V.z;
-  const double g = std::sqrt(gx * gx + gy * gy + gz * gz);
-  if (g <= EPS) {
-    bank.alive[i] = 0;
-    return;
-  }
-
-  const double ghat_x = gx / g;
-  const double ghat_y = gy / g;
-  const double ghat_z = gz / g;
-
-  const double vcm_x = (vx + A * V.x) / (A + 1.0);
-  const double vcm_y = (vy + A * V.y) / (A + 1.0);
-  const double vcm_z = (vz + A * V.z) / (A + 1.0);
-
-  KalbachResult result =
-      sample_kalbach_mann(data.kalbach, rxn.dist_id, E_inc, rng);
-  double out_dir_x, out_dir_y, out_dir_z;
-  sample_cm_direction_from_axis(ghat_x, ghat_y, ghat_z, result.mu, rng,
-                                out_dir_x, out_dir_y, out_dir_z);
-  {
-    const double v_out_cm = std::sqrt(2.0 * result.E_out * EV_TO_J / M_N);
-    const double vpx = vcm_x + v_out_cm * out_dir_x;
-    const double vpy = vcm_y + v_out_cm * out_dir_y;
-    const double vpz = vcm_z + v_out_cm * out_dir_z;
-    set_particle_from_velocity(bank, i, vpx, vpy, vpz);
-  }
-
-  for (int n = 0; n < rxn.multiplicity - 1; ++n) {
-    const int slot = secondary_count;
-    if (slot >= secondary_bank.capacity) {
-      continue;
-    }
-    ++secondary_count;
-
-    secondary_bank.x[slot] = bank.x[i];
-    secondary_bank.y[slot] = bank.y[i];
-    secondary_bank.z[slot] = bank.z[i];
-    secondary_bank.w[slot] = bank.w[i];
-    secondary_bank.macro_xs_t[slot] = 0.0;
-    secondary_bank.alive[slot] = 1;
-    secondary_bank.rxn_nuclide_idx[slot] = 0;
-    secondary_bank.rxn_rxn_idx[slot] = 0;
-    secondary_bank.rxn_type[slot] = 0;
-
-    KalbachResult sec_result =
-        sample_kalbach_mann(data.kalbach, rxn.dist_id, E_inc, rng);
-
-    sample_cm_direction_from_axis(ghat_x, ghat_y, ghat_z, sec_result.mu, rng,
-                                  out_dir_x, out_dir_y, out_dir_z);
-    const double v_out_cm = std::sqrt(2.0 * sec_result.E_out * EV_TO_J / M_N);
-    const double svx = vcm_x + v_out_cm * out_dir_x;
-    const double svy = vcm_y + v_out_cm * out_dir_y;
-    const double svz = vcm_z + v_out_cm * out_dir_z;
-
-    set_particle_from_velocity(secondary_bank, slot, svx, svy, svz);
-    if (!secondary_bank.alive[slot])
-      continue;
-
-    secondary_bank.rng[slot] = RNG(rng());
-  }
-}
-*/
-
-void multiply_imp(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
+// Implicit (n,xn) treatment avoids particle-bank growth and dynamic allocation.
+void multiply(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
               const ReactionDescriptor &rxn, const NuclearData &data,
               double temperature) {
   RNG &rng = bank.rng[i];
@@ -369,9 +289,7 @@ void multiply_imp(ParticleBankView bank, int i, const NuclideDescriptor &nuc,
     const double vpy = vcm_y + v_out_cm * out_dir_y;
     const double vpz = vcm_z + v_out_cm * out_dir_z;
     set_particle_from_velocity(bank, i, vpx, vpy, vpz);
-    bank.w[i] *= rxn.multiplicity
+    bank.w[i] *= rxn.multiplicity;
   }
 
 }
-
-

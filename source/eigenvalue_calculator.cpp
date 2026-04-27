@@ -97,8 +97,6 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
     std::swap(state.current_bank, state.fission_bank);
     state.fission_bank.clear_active();
     state.fission_count = 0;
-    state.secondary_bank.clear_active();
-    state.secondary_count = 0;
     const int n_resampled =
         comb_bank(state.current_bank, state.current_bank.size, n_particles,
                   state.rng);
@@ -165,7 +163,7 @@ void calculate_k_eigenvalue(const Material &mat, const NuclearData &data,
     meta.k_eff_final_rel_err = final_rel_err;
 
     TallyOutputOptions out;
-    out.file_path = "tallies/k_eigenvalue_tallies.json";
+    out.file_path = "tallies/results.json";
     state.tallies.write_json(meta, mat, data, out);
   }
 }

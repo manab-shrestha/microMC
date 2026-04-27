@@ -17,8 +17,8 @@ inline std::vector<TallySpec> default_tally_specs() {
   GridDimSpec energy;
   energy.dim = GridDim::ENERGY;
   energy.spacing = GridSpacing::UNIFORM_LETHARGY;
-  energy.min_eV = 1.0e-5;
-  energy.max_eV = 1.0e7;
+  energy.min = 1.0e-5;
+  energy.max = 1.0e7;
   energy.n_bins = 500;
   energy.outside_policy = GridOutsidePolicy::DROP;
 

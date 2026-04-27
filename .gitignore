@@ -22,6 +22,9 @@ __pycache__/
 # Tallies (binary output)
 tallies/*.bin
 
+# Results
+tallies/*.json
+
 # Images (regenerated from tally data)
 *.png
 *.jpeg
@@ -39,5 +42,6 @@ perf/
 *.pdf
 
 # descriptive files
+# markdown/
 *.md
 !README.md

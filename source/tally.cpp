@@ -32,6 +32,12 @@ std::string grid_dim_name(GridDim d) {
   switch (d) {
   case GridDim::ENERGY:
     return "ENERGY";
+  case GridDim::X:
+    return "X";
+  case GridDim::Y:
+    return "Y";
+  case GridDim::Z:
+    return "Z";
   }
   return "UNKNOWN";
 }
@@ -98,55 +104,55 @@ bool is_strictly_increasing(const std::vector<double> &v) {
   return std::isfinite(v.front());
 }
 
-std::vector<double> build_energy_edges(const GridDimSpec &dim,
-                                       const std::string &tally_name) {
+std::vector<double> build_grid_edges(const GridDimSpec &dim,
+                                     const std::string &tally_name) {
   std::vector<double> edges;
 
   switch (dim.spacing) {
   case GridSpacing::CUSTOM_EDGES:
-    edges = dim.bin_edges_eV;
+    edges = dim.bin_edges;
     if (!is_strictly_increasing(edges)) {
       throw std::runtime_error("Tally '" + tally_name +
-                               "': custom energy edges must be strictly "
+                               "': custom grid edges must be strictly "
                                "increasing and finite");
     }
     return edges;
 
   case GridSpacing::UNIFORM_LINEAR: {
-    if (dim.n_bins <= 0 || !(dim.max_eV > dim.min_eV) ||
-        !std::isfinite(dim.min_eV) || !std::isfinite(dim.max_eV)) {
+    if (dim.n_bins <= 0 || !(dim.max > dim.min) ||
+        !std::isfinite(dim.min) || !std::isfinite(dim.max)) {
       throw std::runtime_error("Tally '" + tally_name +
                                "': invalid UNIFORM_LINEAR grid parameters");
     }
     edges.resize(static_cast<size_t>(dim.n_bins) + 1);
-    const double dE = (dim.max_eV - dim.min_eV) / dim.n_bins;
+    const double dx = (dim.max - dim.min) / dim.n_bins;
     for (int i = 0; i <= dim.n_bins; ++i)
-      edges[static_cast<size_t>(i)] = dim.min_eV + i * dE;
+      edges[static_cast<size_t>(i)] = dim.min + i * dx;
     return edges;
   }
 
   case GridSpacing::UNIFORM_LETHARGY: {
-    if (dim.n_bins <= 0 || !(dim.max_eV > dim.min_eV) || dim.min_eV <= 0.0 ||
-        !std::isfinite(dim.min_eV) || !std::isfinite(dim.max_eV)) {
+    if (dim.n_bins <= 0 || !(dim.max > dim.min) || dim.min <= 0.0 ||
+        !std::isfinite(dim.min) || !std::isfinite(dim.max)) {
       throw std::runtime_error("Tally '" + tally_name +
                                "': invalid UNIFORM_LETHARGY grid parameters");
     }
     edges.resize(static_cast<size_t>(dim.n_bins) + 1);
-    const double du = std::log(dim.max_eV / dim.min_eV) / dim.n_bins;
+    const double du = std::log(dim.max / dim.min) / dim.n_bins;
     for (int i = 0; i <= dim.n_bins; ++i)
-      edges[static_cast<size_t>(i)] = dim.min_eV * std::exp(i * du);
+      edges[static_cast<size_t>(i)] = dim.min * std::exp(i * du);
     return edges;
   }
 
   case GridSpacing::UNIFORM_LOG10: {
-    if (dim.n_bins <= 0 || !(dim.max_eV > dim.min_eV) || dim.min_eV <= 0.0 ||
-        !std::isfinite(dim.min_eV) || !std::isfinite(dim.max_eV)) {
+    if (dim.n_bins <= 0 || !(dim.max > dim.min) || dim.min <= 0.0 ||
+        !std::isfinite(dim.min) || !std::isfinite(dim.max)) {
       throw std::runtime_error("Tally '" + tally_name +
                                "': invalid UNIFORM_LOG10 grid parameters");
     }
     edges.resize(static_cast<size_t>(dim.n_bins) + 1);
-    const double lmin = std::log10(dim.min_eV);
-    const double lmax = std::log10(dim.max_eV);
+    const double lmin = std::log10(dim.min);
+    const double lmax = std::log10(dim.max);
     const double dl = (lmax - lmin) / dim.n_bins;
     for (int i = 0; i <= dim.n_bins; ++i)
       edges[static_cast<size_t>(i)] = std::pow(10.0, lmin + i * dl);
@@ -157,23 +163,66 @@ std::vector<double> build_energy_edges(const GridDimSpec &dim,
   throw std::runtime_error("Unsupported grid spacing mode");
 }
 
-int locate_energy_bin(const std::vector<double> &edges, double E,
-                      GridOutsidePolicy policy) {
+int locate_grid_bin(const std::vector<double> &edges, double value,
+                    GridOutsidePolicy policy) {
   const int n_bins = static_cast<int>(edges.size()) - 1;
-  if (n_bins <= 0 || !std::isfinite(E))
+  if (n_bins <= 0 || !std::isfinite(value))
     return -1;
 
-  if (E < edges.front())
+  if (value < edges.front())
     return (policy == GridOutsidePolicy::CLAMP) ? 0 : -1;
 
-  if (E >= edges.back())
+  if (value >= edges.back())
     return (policy == GridOutsidePolicy::CLAMP) ? (n_bins - 1) : -1;
 
-  auto it = std::upper_bound(edges.begin(), edges.end(), E);
+  auto it = std::upper_bound(edges.begin(), edges.end(), value);
   int bin = static_cast<int>(it - edges.begin()) - 1;
   if (bin < 0 || bin >= n_bins)
     return -1;
   return bin;
+}
+
+double value_for_dim(GridDim dim, double x, double y, double z, double E) {
+  switch (dim) {
+  case GridDim::ENERGY:
+    return E;
+  case GridDim::X:
+    return x;
+  case GridDim::Y:
+    return y;
+  case GridDim::Z:
+    return z;
+  }
+  return std::numeric_limits<double>::quiet_NaN();
+}
+
+int locate_tally_bin(const TallySpec &spec,
+                     const std::vector<std::vector<double>> &edges_by_dim,
+                     const std::vector<int> &shape,
+                     const std::vector<GridOutsidePolicy> &policies, double x,
+                     double y, double z, double E) {
+  int flat = 0;
+  for (size_t d = 0; d < spec.grid.dims.size(); ++d) {
+    const GridDimSpec &dim = spec.grid.dims[d];
+    const double value = value_for_dim(dim.dim, x, y, z, E);
+    const int bin = locate_grid_bin(edges_by_dim[d], value, policies[d]);
+    if (bin < 0)
+      return -1;
+    flat = flat * shape[d] + bin;
+  }
+  return flat;
+}
+
+int n_total_bins(const std::vector<int> &shape) {
+  int total = 1;
+  for (int n : shape) {
+    if (n <= 0)
+      return 0;
+    if (total > std::numeric_limits<int>::max() / n)
+      throw std::runtime_error("Tally grid has too many bins");
+    total *= n;
+  }
+  return total;
 }
 
 bool rxn_in_filter(RxnType type, const std::vector<RxnType> &filter) {
@@ -440,8 +489,7 @@ void TallyManager::configure(const Material &mat, const NuclearData &data,
   n_active_cycles_ = 0;
   scoring_active_ = false;
 
-  grid_edges_eV_.clear();
-  grid_n_bins_.clear();
+  grid_edges_.clear();
   grid_shapes_.clear();
   outside_policies_.clear();
   material_enabled_.clear();
@@ -453,10 +501,9 @@ void TallyManager::configure(const Material &mat, const NuclearData &data,
   rel_err_cache_.clear();
 
   const size_t n_tallies = specs_.size();
-  grid_edges_eV_.resize(n_tallies);
-  grid_n_bins_.resize(n_tallies, 0);
+  grid_edges_.resize(n_tallies);
   grid_shapes_.resize(n_tallies);
-  outside_policies_.resize(n_tallies, GridOutsidePolicy::DROP);
+  outside_policies_.resize(n_tallies);
   material_enabled_.resize(n_tallies, true);
   selected_mat_slots_.resize(n_tallies);
   rxn_filters_.resize(n_tallies);
@@ -474,24 +521,35 @@ void TallyManager::configure(const Material &mat, const NuclearData &data,
     if (!names.insert(spec.name).second)
       throw std::runtime_error("Duplicate tally name: '" + spec.name + "'");
 
-    if (spec.grid.dims.size() != 1) {
+    if (spec.grid.dims.empty()) {
       throw std::runtime_error("Tally '" + spec.name +
-                               "': v1 requires exactly one grid dimension");
+                               "': requires at least one grid dimension");
     }
 
-    const GridDimSpec &dim = spec.grid.dims[0];
-    if (dim.dim != GridDim::ENERGY) {
-      throw std::runtime_error("Tally '" + spec.name +
-                               "': v1 only supports ENERGY grid dimension");
+    std::set<int> dims_seen;
+    grid_edges_[t].reserve(spec.grid.dims.size());
+    grid_shapes_[t].reserve(spec.grid.dims.size());
+    outside_policies_[t].reserve(spec.grid.dims.size());
+
+    for (const GridDimSpec &dim : spec.grid.dims) {
+      const int dim_key = static_cast<int>(dim.dim);
+      if (!dims_seen.insert(dim_key).second) {
+        throw std::runtime_error("Tally '" + spec.name +
+                                 "': duplicate grid dimension '" +
+                                 grid_dim_name(dim.dim) + "'");
+      }
+
+      grid_edges_[t].push_back(build_grid_edges(dim, spec.name));
+      grid_shapes_[t].push_back(
+          static_cast<int>(grid_edges_[t].back().size()) - 1);
+      outside_policies_[t].push_back(dim.outside_policy);
     }
 
-    grid_edges_eV_[t] = build_energy_edges(dim, spec.name);
-    grid_n_bins_[t] = static_cast<int>(grid_edges_eV_[t].size()) - 1;
-    grid_shapes_[t] = {grid_n_bins_[t]};
-    outside_policies_[t] = dim.outside_policy;
+    const int total_bins = n_total_bins(grid_shapes_[t]);
 
     material_enabled_[t] = material_matches(spec.materials, mat);
-    selected_mat_slots_[t] = resolve_nuclide_slots(spec.nuclides, mat, spec.name);
+    selected_mat_slots_[t] =
+        resolve_nuclide_slots(spec.nuclides, mat, spec.name);
 
     if (spec.quantity != TallyQuantity::RXN_RATE &&
         !spec.reactions.types.empty()) {
@@ -503,13 +561,13 @@ void TallyManager::configure(const Material &mat, const NuclearData &data,
     rxn_filters_[t] = spec.reactions.types;
 
     TallyBinStats &s = stats_[t];
-    s.sum.assign(static_cast<size_t>(grid_n_bins_[t]), 0.0);
-    s.sum_sq.assign(static_cast<size_t>(grid_n_bins_[t]), 0.0);
-    s.cycle_sum.assign(static_cast<size_t>(grid_n_bins_[t]), 0.0);
+    s.sum.assign(static_cast<size_t>(total_bins), 0.0);
+    s.sum_sq.assign(static_cast<size_t>(total_bins), 0.0);
+    s.cycle_sum.assign(static_cast<size_t>(total_bins), 0.0);
 
-    mean_cache_[t].assign(static_cast<size_t>(grid_n_bins_[t]), 0.0);
-    std_err_cache_[t].assign(static_cast<size_t>(grid_n_bins_[t]), 0.0);
-    rel_err_cache_[t].assign(static_cast<size_t>(grid_n_bins_[t]), 0.0);
+    mean_cache_[t].assign(static_cast<size_t>(total_bins), 0.0);
+    std_err_cache_[t].assign(static_cast<size_t>(total_bins), 0.0);
+    rel_err_cache_[t].assign(static_cast<size_t>(total_bins), 0.0);
   }
 }
 
@@ -522,13 +580,15 @@ void TallyManager::begin_cycle(bool active_cycle) {
     std::fill(s.cycle_sum.begin(), s.cycle_sum.end(), 0.0);
 }
 
-void TallyManager::score_collision(double E, double w, double macro_xs_t,
+void TallyManager::score_collision(double x, double y, double z, double E,
+                                   double w, double macro_xs_t,
                                    const Material &mat,
                                    const NuclearData &data) {
   if (!scoring_active_)
     return;
   if (!(macro_xs_t > 0.0) || !std::isfinite(macro_xs_t) || !std::isfinite(w) ||
-      !std::isfinite(E)) {
+      !std::isfinite(E) || !std::isfinite(x) || !std::isfinite(y) ||
+      !std::isfinite(z)) {
     return;
   }
 
@@ -536,7 +596,8 @@ void TallyManager::score_collision(double E, double w, double macro_xs_t,
     if (!material_enabled_[t])
       continue;
 
-    const int bin = locate_energy_bin(grid_edges_eV_[t], E, outside_policies_[t]);
+    const int bin = locate_tally_bin(specs_[t], grid_edges_[t], grid_shapes_[t],
+                                     outside_policies_[t], x, y, z, E);
     if (bin < 0)
       continue;
 
@@ -778,32 +839,36 @@ void TallyManager::write_json(const RunMetadata &run_meta, const Material &mat,
     os << "\"dims\": [";
     write_newline(os, pretty);
 
-    const GridDimSpec &dim = spec.grid.dims[0];
-    write_indent(os, 5, indent, pretty);
-    os << '{';
-    write_newline(os, pretty);
+    for (size_t d = 0; d < spec.grid.dims.size(); ++d) {
+      const GridDimSpec &dim = spec.grid.dims[d];
+      write_indent(os, 5, indent, pretty);
+      os << '{';
+      write_newline(os, pretty);
 
-    write_indent(os, 6, indent, pretty);
-    os << "\"dim\": \"" << grid_dim_name(dim.dim) << "\",";
-    write_newline(os, pretty);
+      write_indent(os, 6, indent, pretty);
+      os << "\"dim\": \"" << grid_dim_name(dim.dim) << "\",";
+      write_newline(os, pretty);
 
-    write_indent(os, 6, indent, pretty);
-    os << "\"spacing\": \"" << grid_spacing_name(dim.spacing) << "\",";
-    write_newline(os, pretty);
+      write_indent(os, 6, indent, pretty);
+      os << "\"spacing\": \"" << grid_spacing_name(dim.spacing) << "\",";
+      write_newline(os, pretty);
 
-    write_indent(os, 6, indent, pretty);
-    os << "\"outside_policy\": \""
-       << outside_policy_name(dim.outside_policy) << "\",";
-    write_newline(os, pretty);
+      write_indent(os, 6, indent, pretty);
+      os << "\"outside_policy\": \""
+         << outside_policy_name(dim.outside_policy) << "\",";
+      write_newline(os, pretty);
 
-    write_indent(os, 6, indent, pretty);
-    os << "\"bin_edges_eV\": ";
-    write_number_array(os, grid_edges_eV_[t], 6, indent, pretty);
-    write_newline(os, pretty);
+      write_indent(os, 6, indent, pretty);
+      os << "\"bin_edges\": ";
+      write_number_array(os, grid_edges_[t][d], 6, indent, pretty);
+      write_newline(os, pretty);
 
-    write_indent(os, 5, indent, pretty);
-    os << '}';
-    write_newline(os, pretty);
+      write_indent(os, 5, indent, pretty);
+      os << '}';
+      if (d + 1 != spec.grid.dims.size())
+        os << ',';
+      write_newline(os, pretty);
+    }
 
     write_indent(os, 4, indent, pretty);
     os << "],";

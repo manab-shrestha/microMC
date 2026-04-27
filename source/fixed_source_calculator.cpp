@@ -30,9 +30,7 @@ void calculate_fixed_source(const Material &mat, const NuclearData &data,
 
     state.current_bank.clear_active();
     state.fission_bank.clear_active();
-    state.secondary_bank.clear_active();
     state.fission_count = 0;
-    state.secondary_count = 0;
     init_source(state, n_particles, true, fixed_source_energy);
 
     double w_source = sum_weights(state.current_bank);

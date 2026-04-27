@@ -4,7 +4,7 @@
 #include "xs_lookup.h"
 #include <algorithm>
 #include <cmath>
-#include <random>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -15,14 +15,104 @@ constexpr double AMU_TO_KG = 1.66053906660e-27;
 constexpr double M_N = 1.67492749804e-27;
 constexpr double PI = 3.14159265358979323846;
 
+template <typename Real = double>
+class NormalDistribution {
+  static_assert(std::is_floating_point_v<Real>, "Real must be floating-point");
+
+public:
+  NormalDistribution(Real mean = Real(0), Real stddev = Real(1))
+      : mean_(mean), stddev_(stddev) {}
+
+  template <typename RNG>
+  Real operator()(RNG &rng) {
+    if (has_spare_) {
+      has_spare_ = false;
+      return mean_ + stddev_ * spare_;
+    }
+
+    Real u, v, s;
+    do {
+      u = Real(2) * static_cast<Real>(uniform(rng)) - Real(1);
+      v = Real(2) * static_cast<Real>(uniform(rng)) - Real(1);
+      s = u * u + v * v;
+    } while (s >= Real(1) || s <= Real(0));
+
+    Real factor = std::sqrt(Real(-2) * std::log(s) / s);
+    spare_ = v * factor;
+    has_spare_ = true;
+
+    return mean_ + stddev_ * (u * factor);
+  }
+
+  void reset() { has_spare_ = false; }
+  Real mean() const { return mean_; }
+  Real stddev() const { return stddev_; }
+
+private:
+  Real mean_;
+  Real stddev_;
+  bool has_spare_ = false;
+  Real spare_ = Real(0);
+};
+
+template <typename Real = double>
+class GammaDistribution {
+  static_assert(std::is_floating_point_v<Real>, "Real must be floating-point");
+
+public:
+  GammaDistribution(Real shape, Real scale = Real(1))
+      : shape_(shape), scale_(scale) {}
+
+  template <typename RNG, typename Normal>
+  Real operator()(RNG &rng, Normal &normal) const {
+    Real x;
+    if (shape_ < Real(1)) {
+      const Real u = static_cast<Real>(uniform(rng));
+      GammaDistribution<Real> boosted(shape_ + Real(1));
+      x = boosted(rng, normal) * std::pow(u, Real(1) / shape_);
+    } else {
+      x = sample_shape_ge_one(rng, normal);
+    }
+
+    return scale_ * x;
+  }
+
+private:
+  Real shape_;
+  Real scale_;
+
+  template <typename RNG, typename Normal>
+  Real sample_shape_ge_one(RNG &rng, Normal &normal) const {
+    const Real d = shape_ - Real(1) / Real(3);
+    const Real c = Real(1) / std::sqrt(Real(9) * d);
+
+    while (true) {
+      const Real z = normal(rng);
+      Real v = Real(1) + c * z;
+      if (v <= Real(0))
+        continue;
+
+      v = v * v * v;
+      const Real u = static_cast<Real>(uniform(rng));
+      if (u < Real(1) - Real(0.0331) * z * z * z * z)
+        return d * v;
+
+      if (std::log(u) < Real(0.5) * z * z + d * (Real(1) - v + std::log(v)))
+        return d * v;
+    }
+  }
+};
+
 double sample_x2exp_minus_x2(RNG &rng) {
-  std::gamma_distribution<double> gamma_3_over_2(1.5, 1.0);
-  return std::sqrt(gamma_3_over_2(rng));
+  NormalDistribution<double> normal;
+  GammaDistribution<double> gamma_3_over_2(1.5);
+  return std::sqrt(gamma_3_over_2(rng, normal));
 }
 
 double sample_x3exp_minus_x2(RNG &rng) {
-  std::gamma_distribution<double> gamma_2(2.0, 1.0);
-  return std::sqrt(gamma_2(rng));
+  NormalDistribution<double> normal;
+  GammaDistribution<double> gamma_2(2.0);
+  return std::sqrt(gamma_2(rng, normal));
 }
 } // namespace
 
@@ -235,7 +325,7 @@ Velocity sample_target_velocity(double A, double T, RNG &rng) {
   const double m = A * AMU_TO_KG;
   const double sigma = std::sqrt(K_B * T / m);
 
-  std::normal_distribution<double> normal(0.0, sigma);
+  NormalDistribution<double> normal(0.0, sigma);
 
   return {normal(rng), normal(rng), normal(rng)};
 }

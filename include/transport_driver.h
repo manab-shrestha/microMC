@@ -10,10 +10,9 @@
 struct TransportState {
   ParticleBankHost current_bank;
   ParticleBankHost fission_bank;
-  //ParticleBankHost secondary_bank;
 
   int fission_count{0};
-  //int secondary_count{0};
+
   const Material *material{nullptr};
   const NuclearData *data{nullptr};
 
@@ -27,7 +26,9 @@ struct TransportState {
 
 void advance(TransportState &state);
 void sample_reaction(TransportState &state);
-void process_collision(TransportState &state);
+void collide(TransportState &state);
+void kill_out_of_bounds(TransportState &state);
+void compact_alive(TransportState &state);
 
 int comb_bank(ParticleBankHost &bank, int size, int n_target, RNG &rng);
 

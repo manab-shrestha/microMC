@@ -33,8 +33,11 @@ set ures 0
 %set acelib "/home/ms3281/endfb71/s2v0_endfb71.xsdata"
 set acelib "/Users/shrestha/endfb71/s2v0_endfb71.xsdata"
 
+% --- (dis/en)able group constant genenration --- %
+set gcu -1
+
 % --- neutron population and criticality cycles --- %
-set pop 100000 500 50
+set pop 1000000 250 50
 
 % --- normalisation --- %
 % set flux 1

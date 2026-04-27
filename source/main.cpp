@@ -11,16 +11,43 @@ std::vector<TallySpec> build_user_tallies() {
   GridDimSpec energy_grid;
   energy_grid.dim = GridDim::ENERGY;
   energy_grid.spacing = GridSpacing::UNIFORM_LETHARGY;
-  energy_grid.min_eV = 1.0e-5;
-  energy_grid.max_eV = 20.0e6;
+  energy_grid.min = 1.0e-5;
+  energy_grid.max = 20.0e6;
   energy_grid.n_bins = 500;
   energy_grid.outside_policy = GridOutsidePolicy::DROP;
 
   TallyGridSpec grid;
   grid.dims.push_back(energy_grid);
 
+  GridDimSpec x_grid;
+  x_grid.dim = GridDim::X;
+  x_grid.spacing = GridSpacing::UNIFORM_LINEAR;
+  x_grid.min = -5.0;
+  x_grid.max = 5.0;
+  x_grid.n_bins = 5e3;
+  x_grid.outside_policy = GridOutsidePolicy::DROP;
+
+  GridDimSpec y_grid = x_grid;
+  y_grid.dim = GridDim::Y;
+
+  GridDimSpec z_grid = x_grid;
+  z_grid.dim = GridDim::Z;
+
+  TallyGridSpec spat_grid;
+  spat_grid.dims = {x_grid};
+
+  TallyGridSpec XY_grid;
+  XY_grid.dims = {x_grid, y_grid};
+
   std::vector<TallySpec> tallies;
 
+  TallySpec xy_flux;
+  xy_flux.name = "mesh_flux_all";
+  xy_flux.quantity = TallyQuantity::FLUX;
+  xy_flux.grid = XY_grid;
+  tallies.push_back(xy_flux);
+  
+  /*
   TallySpec flux;
   flux.name = "flux_all";
   flux.quantity = TallyQuantity::FLUX;
@@ -70,6 +97,7 @@ std::vector<TallySpec> build_user_tallies() {
   kappa_f.quantity = TallyQuantity::KAPPA_FISSION;
   kappa_f.grid = grid;
   tallies.push_back(kappa_f);
+  */
 
   return tallies;
 }
@@ -87,6 +115,13 @@ int main(int argc, char *argv[]) {
                    {1001, 8016, 92235, 92238},
                    {0.4940, 0.3461, 0.005678, 0.1541}};
 
+  Material ne8 = {"ne8",
+                  0.0,
+                  900,
+                  {1001,8016,92235,92238},
+                  //{5.01e-2, 7.15e-2, 8.22e-4, 2.23e-2}};
+                  {5.01e-2, 7.15e-2, 8.22e-1, 2.23e-2}};
+
   Material absorber = {"absorber",
                        -10.49,
                        900.0,
@@ -95,14 +130,14 @@ int main(int argc, char *argv[]) {
 
   Material water = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
 
-  Material *all_mats[] = {&fuel, &absorber, &water};
+  Material *all_mats[] = {&fuel,&ne8, &absorber, &water};
 
   const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
   //const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron";
 
   NuclearDataHost host;
   try {
-    host = load_nuclear_data_hdf5(xs_path, all_mats, 3);
+    host = load_nuclear_data_hdf5(xs_path, all_mats, 4);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
     return 1;
@@ -118,7 +153,7 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    calculate_k_eigenvalue(fuel, data, 1e5, 50, 500, 987654321, tally_on,
+    calculate_k_eigenvalue(ne8, data, 2e5, 50, 1000, 987654321, tally_on,
                            tallies);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
