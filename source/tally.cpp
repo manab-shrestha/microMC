@@ -7,9 +7,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <limits>
 #include <set>
-#include <sstream>
 #include <stdexcept>
 
 namespace {
@@ -44,14 +44,12 @@ std::string grid_dim_name(GridDim d) {
 
 std::string grid_spacing_name(GridSpacing s) {
   switch (s) {
-  case GridSpacing::CUSTOM_EDGES:
-    return "CUSTOM_EDGES";
+  case GridSpacing::USER_EDGES:
+    return "USER_EDGES";
   case GridSpacing::UNIFORM_LINEAR:
     return "UNIFORM_LINEAR";
   case GridSpacing::UNIFORM_LETHARGY:
     return "UNIFORM_LETHARGY";
-  case GridSpacing::UNIFORM_LOG10:
-    return "UNIFORM_LOG10";
   }
   return "UNKNOWN";
 }
@@ -109,7 +107,7 @@ std::vector<double> build_grid_edges(const GridDimSpec &dim,
   std::vector<double> edges;
 
   switch (dim.spacing) {
-  case GridSpacing::CUSTOM_EDGES:
+  case GridSpacing::USER_EDGES:
     edges = dim.bin_edges;
     if (!is_strictly_increasing(edges)) {
       throw std::runtime_error("Tally '" + tally_name +
@@ -119,8 +117,8 @@ std::vector<double> build_grid_edges(const GridDimSpec &dim,
     return edges;
 
   case GridSpacing::UNIFORM_LINEAR: {
-    if (dim.n_bins <= 0 || !(dim.max > dim.min) ||
-        !std::isfinite(dim.min) || !std::isfinite(dim.max)) {
+    if (dim.n_bins <= 0 || !(dim.max > dim.min) || !std::isfinite(dim.min) ||
+        !std::isfinite(dim.max)) {
       throw std::runtime_error("Tally '" + tally_name +
                                "': invalid UNIFORM_LINEAR grid parameters");
     }
@@ -144,24 +142,10 @@ std::vector<double> build_grid_edges(const GridDimSpec &dim,
     return edges;
   }
 
-  case GridSpacing::UNIFORM_LOG10: {
-    if (dim.n_bins <= 0 || !(dim.max > dim.min) || dim.min <= 0.0 ||
-        !std::isfinite(dim.min) || !std::isfinite(dim.max)) {
-      throw std::runtime_error("Tally '" + tally_name +
-                               "': invalid UNIFORM_LOG10 grid parameters");
-    }
-    edges.resize(static_cast<size_t>(dim.n_bins) + 1);
-    const double lmin = std::log10(dim.min);
-    const double lmax = std::log10(dim.max);
-    const double dl = (lmax - lmin) / dim.n_bins;
-    for (int i = 0; i <= dim.n_bins; ++i)
-      edges[static_cast<size_t>(i)] = std::pow(10.0, lmin + i * dl);
-    return edges;
-  }
-  }
-
-  throw std::runtime_error("Unsupported grid spacing mode");
-}
+    std::cout << "Unhandled GridSpacing enumeration" << '\n';
+    return {};
+  };
+};
 
 int locate_grid_bin(const std::vector<double> &edges, double value,
                     GridOutsidePolicy policy) {
@@ -357,9 +341,10 @@ double macro_nu_fission_filtered(const Material &mat, const NuclearData &data,
   return sum;
 }
 
-double macro_kappa_fission_filtered(const Material &mat, const NuclearData &data,
-                                    double E,
-                                    const std::vector<int> &selected_mat_slots) {
+double
+macro_kappa_fission_filtered(const Material &mat, const NuclearData &data,
+                             double E,
+                             const std::vector<int> &selected_mat_slots) {
   double sum = 0.0;
   for (int slot : selected_mat_slots) {
     const int nuclide_idx = mat.nuclide_ids[slot];
@@ -411,10 +396,9 @@ std::vector<int> resolve_nuclide_slots(const NuclideFilter &filter,
       }
     }
     if (!found) {
-      throw std::runtime_error("Tally '" + tally_name + "': ZAID " +
-                               std::to_string(req_zaid) +
-                               " is not present in material '" +
-                               std::string(mat.name) + "'");
+      throw std::runtime_error(
+          "Tally '" + tally_name + "': ZAID " + std::to_string(req_zaid) +
+          " is not present in material '" + std::string(mat.name) + "'");
     }
   }
 
@@ -462,8 +446,9 @@ void write_number_array(std::ostream &os, const std::vector<T> &values,
   os << ']';
 }
 
-void write_string_array(std::ostream &os, const std::vector<std::string> &values,
-                        int level, int step, bool pretty) {
+void write_string_array(std::ostream &os,
+                        const std::vector<std::string> &values, int level,
+                        int step, bool pretty) {
   os << '[';
   if (!values.empty()) {
     write_newline(os, pretty);
@@ -540,8 +525,8 @@ void TallyManager::configure(const Material &mat, const NuclearData &data,
       }
 
       grid_edges_[t].push_back(build_grid_edges(dim, spec.name));
-      grid_shapes_[t].push_back(
-          static_cast<int>(grid_edges_[t].back().size()) - 1);
+      grid_shapes_[t].push_back(static_cast<int>(grid_edges_[t].back().size()) -
+                                1);
       outside_policies_[t].push_back(dim.outside_policy);
     }
 
@@ -621,7 +606,8 @@ void TallyManager::score_collision(double x, double y, double z, double E,
       break;
     }
     case TallyQuantity::RXN_RATE:
-      multiplier = macro_rxn_rate_filtered(mat, data, E, slots, rxn_filters_[t]);
+      multiplier =
+          macro_rxn_rate_filtered(mat, data, E, slots, rxn_filters_[t]);
       break;
     case TallyQuantity::NU_FISSION:
       multiplier = macro_nu_fission_filtered(mat, data, E, slots);
@@ -751,8 +737,7 @@ void TallyManager::write_json(const RunMetadata &run_meta, const Material &mat,
   os << "\"seed\": " << run_meta.seed << ',';
   write_newline(os, pretty);
   write_indent(os, 2, indent, pretty);
-  os << "\"material_name\": \"" << json_escape(run_meta.material_name)
-     << "\",";
+  os << "\"material_name\": \"" << json_escape(run_meta.material_name) << "\",";
   write_newline(os, pretty);
   write_indent(os, 2, indent, pretty);
   os << "\"temperature_K\": " << run_meta.temperature_K << ',';
@@ -804,8 +789,7 @@ void TallyManager::write_json(const RunMetadata &run_meta, const Material &mat,
     write_newline(os, pretty);
 
     write_indent(os, 3, indent, pretty);
-    os << "\"quantity\": \"" << tally_quantity_name(spec.quantity)
-       << "\",";
+    os << "\"quantity\": \"" << tally_quantity_name(spec.quantity) << "\",";
     write_newline(os, pretty);
 
     write_indent(os, 3, indent, pretty);
@@ -854,8 +838,8 @@ void TallyManager::write_json(const RunMetadata &run_meta, const Material &mat,
       write_newline(os, pretty);
 
       write_indent(os, 6, indent, pretty);
-      os << "\"outside_policy\": \""
-         << outside_policy_name(dim.outside_policy) << "\",";
+      os << "\"outside_policy\": \"" << outside_policy_name(dim.outside_policy)
+         << "\",";
       write_newline(os, pretty);
 
       write_indent(os, 6, indent, pretty);

@@ -1,9 +1,10 @@
 #include "transport_driver.h"
-#include "direction.h"
 #include "collision.h"
+#include "direction.h"
 #include "sampling.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <stdexcept>
 
 namespace {
@@ -20,8 +21,8 @@ void reserve_fission_bank(TransportState &state) {
 }
 } // namespace
 
-namespace GEO{
-bool inside_julia_xy(double x, double y) {
+namespace GEO {
+bool inside_julia_xy(const double &x, const double &y) {
   constexpr double center_x = 0.0;
   constexpr double center_y = 0.0;
   constexpr double physical_half_width = 5.0;
@@ -41,7 +42,29 @@ bool inside_julia_xy(double x, double y) {
   }
   return true;
 }
+
+bool inside_slab(const double &x, const double &y) {
+  return ((x * x + y * y * y * y) < 50);
 }
+
+bool inside_flower(const double u, const double v, const double a,
+                   const double b, const double n) {
+  const double x = u - a;
+  const double y = v - b;
+  const double r2 = x * x + y * y;
+  const double value =
+      std::pow(r2, 0.5 * n) + 0.3 * std::sin(10.0 * std::atan2(y, x));
+
+  return value < 1.0;
+}
+bool inside_diamond(const double u, const double v, const double a,
+                    const double b, const double R) {
+  const double x = u - a;
+  const double y = v - b;
+
+  return (std::abs(y) < R * (x + 1)) && (std::abs(y) < R * (-x + 1));
+}
+} // namespace GEO
 
 void advance(TransportState &state) {
   const int n = state.current_bank.size;
@@ -88,11 +111,30 @@ void sample_reaction(TransportState &state) {
   }
 }
 
-void kill_out_of_bounds(TransportState &state){
+void kill_out_of_bounds(TransportState &state) {
   const int n = state.current_bank.size;
   ParticleBankView bank = state.current_bank.view();
-  for(int i = 0; i < n; ++i){
-    if (!GEO::inside_julia_xy(bank.x[i],bank.y[i])) bank.alive[i] = 0;
+
+  for (int i = 0; i < n; ++i) {
+    // if (!GEO::inside_julia_xy(bank.x[i], bank.y[i]))
+    // if (!GEO::inside_slab(bank.x[i], bank.y[i]))
+
+    constexpr double LAT_PITCH = 1.5;
+    constexpr int LAT_N = 10;
+
+    int r = 0;
+    int c = 0;
+    int sum = 0;
+
+    for (int idx = 0; idx < LAT_N * LAT_N; ++idx) {
+      r = idx / LAT_N - LAT_N / 2;
+      c = idx % LAT_N - LAT_N / 2;
+      auto inside = static_cast<unsigned int>(GEO::inside_diamond(
+          bank.x[i], bank.y[i], r * LAT_PITCH, c * LAT_PITCH, 1));
+      sum += inside;
+    }
+    if (!static_cast<bool>(sum))
+      bank.alive[i] = 0;
   }
 }
 
@@ -225,8 +267,8 @@ void init_source(TransportState &state, int n_particles, bool fixed_source,
   for (int i = 0; i < n_particles; ++i) {
     init_particle_defaults(bank, i);
     bank.rng[i] = RNG(state.rng());
-    bank.E[i] =
-        fixed_source ? fixed_source_energy : uniform(state.rng) * MAX_SOURCE_ENERGY;
+    bank.E[i] = fixed_source ? fixed_source_energy
+                             : uniform(state.rng) * MAX_SOURCE_ENERGY;
     sample_isodir(bank.Omega_x[i], bank.Omega_y[i], bank.Omega_z[i],
                   bank.rng[i]);
     bank.alive[i] = 1;

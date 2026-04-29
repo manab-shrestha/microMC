@@ -22,10 +22,10 @@ enum class GridDim : int {
 };
 
 enum class GridSpacing : int {
-  CUSTOM_EDGES = 0,
+  USER_EDGES = 0,
   UNIFORM_LINEAR = 1,
   UNIFORM_LETHARGY = 2,
-  UNIFORM_LOG10 = 3,
+
 };
 
 enum class GridOutsidePolicy : int {
@@ -50,12 +50,12 @@ struct ReactionFilter {
 
 struct GridDimSpec {
   GridDim dim{GridDim::ENERGY};
-  GridSpacing spacing{GridSpacing::CUSTOM_EDGES};
+  GridSpacing spacing{GridSpacing::USER_EDGES};
 
-  // CUSTOM_EDGES mode
+  // USER_EDGES mode
   std::vector<double> bin_edges;
 
-  // Generated grid modes (UNIFORM_LINEAR, UNIFORM_LETHARGY, UNIFORM_LOG10)
+  // Generated grid modes (UNIFORM_LINEAR, UNIFORM_LETHARGY)
   double min{0.0};
   double max{0.0};
   int n_bins{0};
@@ -119,8 +119,8 @@ public:
 
   void begin_cycle(bool active_cycle);
   void score_collision(double x, double y, double z, double E, double w,
-                       double macro_xs_t,
-                       const Material &mat, const NuclearData &data);
+                       double macro_xs_t, const Material &mat,
+                       const NuclearData &data);
   void end_cycle();
 
   int n_active_cycles() const;

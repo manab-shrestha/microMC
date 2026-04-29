@@ -22,8 +22,8 @@ std::vector<TallySpec> build_user_tallies() {
   GridDimSpec x_grid;
   x_grid.dim = GridDim::X;
   x_grid.spacing = GridSpacing::UNIFORM_LINEAR;
-  x_grid.min = -5.0;
-  x_grid.max = 5.0;
+  x_grid.min = -6.0;
+  x_grid.max = 6.0;
   x_grid.n_bins = 5e3;
   x_grid.outside_policy = GridOutsidePolicy::DROP;
 
@@ -46,7 +46,7 @@ std::vector<TallySpec> build_user_tallies() {
   xy_flux.quantity = TallyQuantity::FLUX;
   xy_flux.grid = XY_grid;
   tallies.push_back(xy_flux);
-  
+
   /*
   TallySpec flux;
   flux.name = "flux_all";
@@ -81,10 +81,9 @@ std::vector<TallySpec> build_user_tallies() {
   TallySpec inel_rr;
   inel_rr.name = "inela_rate_u238";
   inel_rr.quantity = TallyQuantity::RXN_RATE;
-  inel_rr.reactions.types = {RxnType::CONTINUUM_INELASTIC, RxnType::DISCRETE_INELASTIC};
-  inel_rr.nuclides.zaids = {92238};
-  inel_rr.grid = grid;
-  tallies.push_back(inel_rr);
+  inel_rr.reactions.types = {RxnType::CONTINUUM_INELASTIC,
+  RxnType::DISCRETE_INELASTIC}; inel_rr.nuclides.zaids = {92238}; inel_rr.grid =
+  grid; tallies.push_back(inel_rr);
 
   TallySpec nu_f;
   nu_f.name = "nu_fission_all";
@@ -106,7 +105,7 @@ std::vector<TallySpec> build_user_tallies() {
 
 int main(int argc, char *argv[]) {
   bool tally_on = (argc > 1 && std::string(argv[1]) == "true");
-  
+
   std::cout << R"(
 
 
@@ -147,7 +146,7 @@ int main(int argc, char *argv[]) {
   Material ne8 = {"ne8",
                   0.0,
                   900,
-                  {1001,8016,92235,92238},
+                  {1001, 8016, 92235, 92238},
                   //{5.01e-2, 7.15e-2, 8.22e-4, 2.23e-2}};
                   {5.01e-2, 7.15e-2, 8.22e-1, 2.23e-2}};
 
@@ -159,10 +158,10 @@ int main(int argc, char *argv[]) {
 
   Material water = {"water", -10.0, 900.0, {1001, 8016}, {2.0, 1.0}};
 
-  Material *all_mats[] = {&fuel,&ne8, &absorber, &water};
+  Material *all_mats[] = {&fuel, &ne8, &absorber, &water};
 
-  const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
-  //const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron";
+  // const std::string xs_path = "/Users/shrestha/endfb-vii.1-hdf5/neutron";
+  const std::string xs_path = "/home/ms3281/endfb-vii.1-hdf5/neutron";
 
   NuclearDataHost host;
   try {
@@ -182,7 +181,7 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    calculate_k_eigenvalue(ne8, data, 2e5, 50, 1000, 987654321, tally_on,
+    calculate_k_eigenvalue(ne8, data, 2e5, 50, 100, 987654321, tally_on,
                            tallies);
   } catch (const std::exception &e) {
     std::cerr << "Fatal: " << e.what() << '\n';
